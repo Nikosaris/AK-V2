@@ -1,0 +1,75 @@
+#ifndef GLOBALS_H
+#define GLOBALS_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+// ============================================================================
+// GPIO PIN DEFINITIONS - All hardware pins defined in one place
+// ============================================================================
+
+// Digital Inputs - Limit Switches
+constexpr uint8_t DOOR_TOP_LIMIT_PIN = 16;
+constexpr uint8_t DOOR_BOTTOM_LIMIT_PIN = 17;
+constexpr uint8_t WINDOW_TOP_LIMIT_PIN = 19;
+constexpr uint8_t WINDOW_BOTTOM_LIMIT_PIN = 23;
+constexpr uint8_t LOCAL_BUTTON_PIN = 25;
+
+// Analog Input - Current Measurement
+constexpr uint8_t ACS712_PIN = 35;
+
+// I2C Bus
+constexpr uint8_t I2C_SDA_PIN = 21;
+constexpr uint8_t I2C_SCL_PIN = 22;
+
+// OneWire Bus
+constexpr uint8_t ONEWIRE_PIN = 4;
+
+// Motor H-Bridge Outputs - Door
+constexpr uint8_t DOOR_IN1_PIN = 5;
+constexpr uint8_t DOOR_IN2_PIN = 18;
+
+// Motor H-Bridge Outputs - Window
+constexpr uint8_t WINDOW_IN1_PIN = 32;
+constexpr uint8_t WINDOW_IN2_PIN = 33;
+
+// Relay Outputs
+constexpr uint8_t CAMERA_RELAY_PIN = 26;
+constexpr uint8_t HEATER_RELAY_PIN = 27;
+constexpr uint8_t LIGHT_RELAY_PIN = 14;
+
+// ============================================================================
+// SYSTEM CONSTANTS
+// ============================================================================
+
+// Serial communication
+constexpr uint32_t SERIAL_BAUD_RATE = 115200;
+
+// PWM Configuration
+constexpr uint8_t PWM_FREQUENCY = 1;          // 1 kHz
+constexpr uint8_t PWM_RESOLUTION = 8;         // 8-bit (0-255)
+constexpr uint8_t PWM_CHANNEL_DOOR_IN1 = 0;
+constexpr uint8_t PWM_CHANNEL_DOOR_IN2 = 1;
+constexpr uint8_t PWM_CHANNEL_WINDOW_IN1 = 2;
+constexpr uint8_t PWM_CHANNEL_WINDOW_IN2 = 3;
+
+// Timeouts and timing
+constexpr uint32_t LOOP_INTERVAL_MS = 50;     // Main loop runs every 50ms (20Hz)
+constexpr uint32_t SERIAL_LOG_INTERVAL_MS = 1000; // Serial logging every 1 second
+
+// ============================================================================
+// GLOBAL VARIABLES (defined in Globals.cpp)
+// ============================================================================
+
+extern unsigned long systemUptime;
+extern unsigned long lastLoopTime;
+extern unsigned long lastSerialLogTime;
+
+// ============================================================================
+// FUNCTION DECLARATIONS (defined in Globals.cpp)
+// ============================================================================
+
+void globals_init();
+void globals_update();
+
+#endif // GLOBALS_H
