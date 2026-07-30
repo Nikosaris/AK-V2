@@ -113,6 +113,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
       height: 100vh;
       left: 0;
       top: 0;
+      z-index: 1000;
     }
     
     .logo {
@@ -375,6 +376,12 @@ const char* HTML_TEMPLATE = R"rawliteral(
       background: #ff9800;
       color: white;
     }
+
+    .time-display {
+      font-size: 16px;
+      color: #4CAF50;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
@@ -388,7 +395,6 @@ const char* HTML_TEMPLATE = R"rawliteral(
       <div class="menu-item" onclick="showPage('automation')">🤖 Automatika</div>
       <div class="menu-item" onclick="showPage('alarms')">🚨 Alarmy</div>
       <div class="menu-item" onclick="showPage('sensors')">📡 Čidla</div>
-      <div class="menu-item" onclick="showPage('camera')">📷 Kamera</div>
       <div class="menu-item" onclick="showPage('lighting')">💡 Osvětlení</div>
       <div class="menu-item" onclick="showPage('heating')">🔥 Topení</div>
       <div class="menu-item" onclick="showPage('network')">🌐 Síť</div>
@@ -402,6 +408,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
       <!-- DASHBOARD -->
       <div class="page active" id="dashboard">
         <h1>📊 Dashboard</h1>
+        <div class="time-display">Čas: <span id="currentTime">--:--:--</span></div>
         <div class="cards">
           <div class="card">
             <div class="card-label">Dveře</div>
@@ -422,6 +429,15 @@ const char* HTML_TEMPLATE = R"rawliteral(
             <div class="button-group">
               <button class="primary" onclick="apiCall('/api/window/open')">Otevřít</button>
               <button class="danger" onclick="apiCall('/api/window/close')">Zavřít</button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Kamera</div>
+            <div class="card-value" id="cameraStatus"><span class="status-badge status-off">VYPNUTO</span></div>
+            <div class="button-group">
+              <button class="primary" onclick="apiCall('/api/camera/on')">Zapnout</button>
+              <button class="danger" onclick="apiCall('/api/camera/off')">Vypnout</button>
             </div>
           </div>
           
@@ -491,9 +507,8 @@ const char* HTML_TEMPLATE = R"rawliteral(
         
         <h2>Osvětlení</h2>
         <div class="button-group">
-          <button class="primary" onclick="apiCall('/api/light/on')">Zapnout</button>
+          <button class="primary" onclick="apiCall('/api/light/auto')">Automatika</button>
           <button class="danger" onclick="apiCall('/api/light/off')">Vypnout</button>
-          <button class="secondary" onclick="apiCall('/api/light/auto')">Automatika</button>
         </div>
         
         <h2>Topení</h2>
@@ -516,8 +531,24 @@ const char* HTML_TEMPLATE = R"rawliteral(
               <input type="number" id="doorTimeout" placeholder="30000">
             </div>
             <div class="form-group">
-              <label>Max Proud (mA)</label>
+              <label>Maximální Proud (mA)</label>
               <input type="number" id="doorMaxCurrent" placeholder="2000">
+            </div>
+            <div class="form-group">
+              <label>Proudová Ochrana při Otevírání (mA)</label>
+              <input type="number" id="doorCurrentOpenProtection" placeholder="1800">
+            </div>
+            <div class="form-group">
+              <label>Proudová Ochrana při Zavírání (mA)</label>
+              <input type="number" id="doorCurrentCloseProtection" placeholder="1800">
+            </div>
+            <div class="form-group">
+              <label>Doba Ignorování Proudu po Rozběhu (ms)</label>
+              <input type="number" id="doorCurrentIgnoreTime" placeholder="500">
+            </div>
+            <div class="form-group">
+              <label>Doba Potvrzení Přetížení (ms)</label>
+              <input type="number" id="doorOvercurrentConfirmTime" placeholder="200">
             </div>
             <div class="form-group">
               <label>Počet Opakování</label>
@@ -526,6 +557,18 @@ const char* HTML_TEMPLATE = R"rawliteral(
             <div class="form-group">
               <label>PWM Otevření (0-255)</label>
               <input type="number" id="doorPwmOpen" placeholder="200">
+            </div>
+            <div class="form-group">
+              <label>PWM Zavření (0-255)</label>
+              <input type="number" id="doorPwmClose" placeholder="200">
+            </div>
+            <div class="form-group">
+              <label>PWM Pomalého Dojezdu (0-255)</label>
+              <input type="number" id="doorPwmSlow" placeholder="100">
+            </div>
+            <div class="form-group">
+              <label>Doba Zpomalení (ms)</label>
+              <input type="number" id="doorSlowdownTime" placeholder="2000">
             </div>
             <button class="primary" onclick="saveDoorSettings()">Uložit</button>
           </div>
@@ -539,8 +582,24 @@ const char* HTML_TEMPLATE = R"rawliteral(
               <input type="number" id="windowTimeout" placeholder="20000">
             </div>
             <div class="form-group">
-              <label>Max Proud (mA)</label>
+              <label>Maximální Proud (mA)</label>
               <input type="number" id="windowMaxCurrent" placeholder="1500">
+            </div>
+            <div class="form-group">
+              <label>Proudová Ochrana při Otevírání (mA)</label>
+              <input type="number" id="windowCurrentOpenProtection" placeholder="1300">
+            </div>
+            <div class="form-group">
+              <label>Proudová Ochrana při Zavírání (mA)</label>
+              <input type="number" id="windowCurrentCloseProtection" placeholder="1300">
+            </div>
+            <div class="form-group">
+              <label>Doba Ignorování Proudu po Rozběhu (ms)</label>
+              <input type="number" id="windowCurrentIgnoreTime" placeholder="500">
+            </div>
+            <div class="form-group">
+              <label>Doba Potvrzení Přetížení (ms)</label>
+              <input type="number" id="windowOvercurrentConfirmTime" placeholder="200">
             </div>
             <div class="form-group">
               <label>Počet Opakování</label>
@@ -549,6 +608,18 @@ const char* HTML_TEMPLATE = R"rawliteral(
             <div class="form-group">
               <label>PWM Otevření (0-255)</label>
               <input type="number" id="windowPwmOpen" placeholder="200">
+            </div>
+            <div class="form-group">
+              <label>PWM Zavření (0-255)</label>
+              <input type="number" id="windowPwmClose" placeholder="200">
+            </div>
+            <div class="form-group">
+              <label>PWM Pomalého Dojezdu (0-255)</label>
+              <input type="number" id="windowPwmSlow" placeholder="100">
+            </div>
+            <div class="form-group">
+              <label>Doba Zpomalení (ms)</label>
+              <input type="number" id="windowSlowdownTime" placeholder="1500">
             </div>
             <button class="primary" onclick="saveWindowSettings()">Uložit</button>
           </div>
@@ -572,67 +643,65 @@ const char* HTML_TEMPLATE = R"rawliteral(
           </div>
         </div>
         
-        <h2>Otevírání Dveří</h2>
+        <h2>Otevírání Dveří - Východ Slunce</h2>
         <div class="cards">
           <div class="card">
-            <div class="form-group">
-              <label>Typ</label>
-              <select>
-                <option>Čas</option>
-                <option>Východ Slunce</option>
-                <option>Kombinace</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Čas (HH:MM)</label>
-              <input type="time">
-            </div>
+            <div class="time-display" id="sunriseDisplay">Východ slunce: --:--</div>
             <div class="form-group">
               <label>Korekce (±minuty)</label>
-              <input type="number" placeholder="0">
+              <input type="number" id="doorOpenCorrection" placeholder="0" min="-120" max="120">
             </div>
+            <button class="primary" onclick="saveDoorAutomation()">Uložit</button>
           </div>
         </div>
         
-        <h2>Zavírání Dveří</h2>
+        <h2>Zavírání Dveří - Západ Slunce</h2>
         <div class="cards">
           <div class="card">
-            <div class="form-group">
-              <label>Typ</label>
-              <select>
-                <option>Čas</option>
-                <option>Západ Slunce</option>
-                <option>Kombinace</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Čas (HH:MM)</label>
-              <input type="time">
-            </div>
+            <div class="time-display" id="sunsetDisplay">Západ slunce: --:--</div>
             <div class="form-group">
               <label>Korekce (±minuty)</label>
-              <input type="number" placeholder="0">
+              <input type="number" id="doorCloseCorrection" placeholder="0" min="-120" max="120">
             </div>
+            <button class="primary" onclick="saveDoorAutomation()">Uložit</button>
           </div>
         </div>
         
-        <h2>Otevírání Okna</h2>
+        <h2>Otevírání Okna - Teplota</h2>
         <div class="cards">
           <div class="card">
             <div class="form-group">
               <label>Teplota Otevření (°C)</label>
-              <input type="number" placeholder="25">
+              <input type="number" id="windowOpenTemp" placeholder="25">
             </div>
+            <button class="primary" onclick="saveWindowAutomation()">Uložit</button>
           </div>
         </div>
         
-        <h2>Zavírání Okna</h2>
+        <h2>Zavírání Okna - Teplota</h2>
         <div class="cards">
           <div class="card">
             <div class="form-group">
               <label>Teplota Zavření (°C)</label>
-              <input type="number" placeholder="23">
+              <input type="number" id="windowCloseTemp" placeholder="23">
             </div>
+            <button class="primary" onclick="saveWindowAutomation()">Uložit</button>
+          </div>
+        </div>
+        
+        <h2>Kamera - Časový Switch (Západ Slunce)</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="time-display" id="cameraTimeDisplay">Zapnutí kamery: --:-- (západ slunce)</div>
+            <div class="form-group">
+              <label>Korekce Času Zapnutí (±minuty před západem)</label>
+              <input type="number" id="cameraTimeCorrection" placeholder="-30" min="-120" max="120">
+            </div>
+            <div class="form-group">
+              <label>Doba Automatického Vypnutí po Zavření (minut)</label>
+              <input type="number" id="cameraAutoOffTime" placeholder="60">
+            </div>
+            <button class="primary" onclick="saveCameraAutomation()">Uložit</button>
           </div>
         </div>
         
@@ -641,20 +710,20 @@ const char* HTML_TEMPLATE = R"rawliteral(
           <div class="card">
             <div class="form-group">
               <label>Zeměpisná Šířka</label>
-              <input type="number" placeholder="50.0" step="0.0001">
+              <input type="number" id="gpsLatitude" placeholder="50.0" step="0.0001">
             </div>
             <div class="form-group">
               <label>Zeměpisná Délka</label>
-              <input type="number" placeholder="14.0" step="0.0001">
+              <input type="number" id="gpsLongitude" placeholder="14.0" step="0.0001">
             </div>
             <div class="form-group">
               <label>Časové Pásmo</label>
-              <select>
+              <select id="timezone">
                 <option>UTC+1 (CET)</option>
                 <option>UTC+2 (CEST)</option>
               </select>
             </div>
-            <button class="primary" onclick="saveAutomation()">Uložit</button>
+            <button class="primary" onclick="saveGPS()">Uložit</button>
           </div>
         </div>
       </div>
@@ -773,31 +842,6 @@ const char* HTML_TEMPLATE = R"rawliteral(
         </div>
       </div>
       
-      <!-- CAMERA -->
-      <div class="page" id="camera">
-        <h1>📷 Kamera</h1>
-        <div class="cards">
-          <div class="card">
-            <div class="form-group">
-              <label>Automatické Zapnutí Před Zavřením (minut)</label>
-              <select>
-                <option>30</option>
-                <option>45</option>
-                <option>60</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Automatické Vypnutí Po Zavření</label>
-              <select>
-                <option>Ano</option>
-                <option>Ne</option>
-              </select>
-            </div>
-            <button class="primary" onclick="saveCameraSettings()">Uložit</button>
-          </div>
-        </div>
-      </div>
-      
       <!-- LIGHTING -->
       <div class="page" id="lighting">
         <h1>💡 Osvětlení</h1>
@@ -805,18 +849,18 @@ const char* HTML_TEMPLATE = R"rawliteral(
           <div class="card">
             <div class="form-group">
               <label>Režim</label>
-              <select>
-                <option>Automatický</option>
-                <option>Ruční</option>
+              <select id="lightingMode">
+                <option>Automatika</option>
+                <option>Vypnuto</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Čas Zapnutí (HH:MM)</label>
-              <input type="time" value="06:00">
+              <label>Čas Zapnutí (HH:MM) - v Automatice</label>
+              <input type="time" id="lightingOnTime" value="06:00">
             </div>
             <div class="form-group">
-              <label>Čas Vypnutí (HH:MM)</label>
-              <input type="time" value="20:00">
+              <label>Čas Vypnutí (HH:MM) - v Automatice</label>
+              <input type="time" id="lightingOffTime" value="20:00">
             </div>
             <button class="primary" onclick="saveLightingSettings()">Uložit</button>
           </div>
@@ -830,11 +874,11 @@ const char* HTML_TEMPLATE = R"rawliteral(
           <div class="card">
             <div class="form-group">
               <label>Prahová Teplota Rosného Bodu (°C)</label>
-              <input type="number" placeholder="10">
+              <input type="number" id="heatingDewpointThreshold" placeholder="10">
             </div>
             <div class="form-group">
               <label>Hystereze (°C)</label>
-              <input type="number" placeholder="2">
+              <input type="number" id="heatingHysteresis" placeholder="2">
             </div>
             <button class="primary" onclick="saveHeatingSettings()">Uložit</button>
           </div>
@@ -848,26 +892,26 @@ const char* HTML_TEMPLATE = R"rawliteral(
           <div class="card">
             <div class="form-group">
               <label>SSID</label>
-              <input type="text" placeholder="WiFi Síť">
+              <input type="text" id="networkSSID" placeholder="WiFi Síť">
             </div>
             <div class="form-group">
               <label>Heslo</label>
-              <input type="password" placeholder="••••••••">
+              <input type="password" id="networkPassword" placeholder="••••••••">
             </div>
             <div class="form-group">
               <label>DHCP</label>
-              <select>
+              <select id="networkDHCP">
                 <option>Zapnuto</option>
                 <option>Vypnuto</option>
               </select>
             </div>
             <div class="form-group">
               <label>Statická IP</label>
-              <input type="text" placeholder="192.168.1.100">
+              <input type="text" id="networkStaticIP" placeholder="192.168.1.100">
             </div>
             <div class="form-group">
               <label>Hostname</label>
-              <input type="text" placeholder="ak-v2">
+              <input type="text" id="networkHostname" placeholder="ak-v2">
             </div>
             <button class="primary" onclick="saveNetworkSettings()">Uložit</button>
           </div>
@@ -955,11 +999,9 @@ const char* HTML_TEMPLATE = R"rawliteral(
   
   <script>
     function showPage(pageId) {
-      // Hide all pages
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
       
-      // Show selected page
       document.getElementById(pageId).classList.add('active');
       event.target.classList.add('active');
     }
@@ -971,12 +1013,21 @@ const char* HTML_TEMPLATE = R"rawliteral(
         .catch(e => console.error('Chyba:', e));
     }
     
+    function updateTime() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('currentTime').textContent = hours + ':' + minutes + ':' + seconds;
+    }
+    
     function updateStatus() {
       fetch('/api/status')
         .then(r => r.json())
         .then(data => {
           document.getElementById('doorStatus').textContent = data.door_status || '--';
           document.getElementById('windowStatus').textContent = data.window_status || '--';
+          document.getElementById('cameraStatus').innerHTML = '<span class="status-badge ' + (data.camera ? 'status-on' : 'status-off') + '">' + (data.camera ? 'ZAPNUTO' : 'VYPNUTO') + '</span>';
           document.getElementById('coopTemp').textContent = (data.coop_temp || 0).toFixed(1) + ' °C';
           document.getElementById('cabinetTemp').textContent = (data.cabinet_temp || 0).toFixed(1) + ' °C';
           document.getElementById('cabinetHumidity').textContent = (data.cabinet_humidity || 0).toFixed(0) + ' %';
@@ -986,54 +1037,26 @@ const char* HTML_TEMPLATE = R"rawliteral(
           document.getElementById('systemMode').textContent = data.system_mode || 'RUN';
           document.getElementById('uptime').textContent = Math.floor((data.uptime || 0) / 1000) + ' s';
           document.getElementById('ipAddress').textContent = data.ip_address || '--';
+          document.getElementById('sensorCoopTemp').textContent = (data.coop_temp || 0).toFixed(1) + ' °C';
+          document.getElementById('sensorCabinetTemp').textContent = (data.cabinet_temp || 0).toFixed(1) + ' °C';
+          document.getElementById('sensorCabinetHumidity').textContent = (data.cabinet_humidity || 0).toFixed(0) + ' %';
+          document.getElementById('sensorDewPoint').textContent = (data.dew_point || 0).toFixed(1) + ' °C';
         })
         .catch(e => console.error('Chyba:', e));
     }
     
-    function saveDoorSettings() {
-      alert('Nastavení dveří uloženo');
-    }
-    
-    function saveWindowSettings() {
-      alert('Nastavení okna uloženo');
-    }
-    
-    function saveAutomation() {
-      alert('Automatika uložena');
-    }
-    
-    function saveCameraSettings() {
-      alert('Nastavení kamery uloženo');
-    }
-    
-    function saveLightingSettings() {
-      alert('Nastavení osvětlení uloženo');
-    }
-    
-    function saveHeatingSettings() {
-      alert('Nastavení topení uloženo');
-    }
-    
-    function saveNetworkSettings() {
-      alert('Nastavení sítě uloženo');
-    }
-    
-    function uploadFirmware() {
-      alert('Funkce nahrávání firmware není implementována');
-    }
-    
-    function restartDevice() {
-      if (confirm('Chcete restartovat zařízení?')) {
-        apiCall('/api/restart');
-      }
-    }
-    
-    function factoryReset() {
-      if (confirm('Chcete obnovit tovární nastavení? Veškeré nastavení bude ztraceno!')) {
-        apiCall('/api/factory-reset');
-      }
-    }
-    
+    function saveDoorSettings() { alert('Nastavení dveří uloženo'); }
+    function saveWindowSettings() { alert('Nastavení okna uloženo'); }
+    function saveDoorAutomation() { alert('Automatika dveří uložena'); }
+    function saveWindowAutomation() { alert('Automatika okna uložena'); }
+    function saveCameraAutomation() { alert('Automatika kamery uložena'); }
+    function saveGPS() { alert('GPS parametry uloženy'); }
+    function saveLightingSettings() { alert('Nastavení osvětlení uloženo'); }
+    function saveHeatingSettings() { alert('Nastavení topení uloženo'); }
+    function saveNetworkSettings() { alert('Nastavení sítě uloženo'); }
+    function uploadFirmware() { alert('Funkce nahrávání firmware není implementována'); }
+    function restartDevice() { if (confirm('Chcete restartovat zařízení?')) apiCall('/api/restart'); }
+    function factoryReset() { if (confirm('Chcete obnovit tovární nastavení?')) apiCall('/api/factory-reset'); }
     function testRelays() { apiCall('/api/test/relays'); }
     function testMotors() { apiCall('/api/test/motors'); }
     function testLimits() { apiCall('/api/test/limits'); }
@@ -1041,8 +1064,9 @@ const char* HTML_TEMPLATE = R"rawliteral(
     function testSHT30() { apiCall('/api/test/sht30'); }
     function testDS18B20() { apiCall('/api/test/ds18b20'); }
     
-    // Aktualizuj status každých 2 sekundy
+    setInterval(updateTime, 1000);
     setInterval(updateStatus, 2000);
+    updateTime();
     updateStatus();
   </script>
 </body>
@@ -1100,6 +1124,7 @@ void webserver_update() {
     String json = "{";
     json += "\"door_status\":\"ZAVŘENO\",";
     json += "\"window_status\":\"ZAVŘENO\",";
+    json += "\"camera\":false,";
     json += "\"coop_temp\":22.5,";
     json += "\"cabinet_temp\":18.3,";
     json += "\"cabinet_humidity\":65,";
@@ -1119,7 +1144,6 @@ void webserver_update() {
     client.print(json);
   }
   else if (path.startsWith("/api/")) {
-    // Generic API handler
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: application/json");
     client.println("Content-Length: 16");
