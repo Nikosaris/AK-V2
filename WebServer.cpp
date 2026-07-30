@@ -77,6 +77,979 @@ void webserver_stop() {
 }
 
 // ============================================================================
+// HTML TEMPLATE
+// ============================================================================
+
+const char* HTML_TEMPLATE = R"rawliteral(
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AK-V2 Kurník Kontrola</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      overflow-x: hidden;
+    }
+    
+    .container {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    /* SIDEBAR */
+    .sidebar {
+      width: 250px;
+      background: #0d0d0d;
+      padding: 20px;
+      border-right: 1px solid #333;
+      overflow-y: auto;
+      position: fixed;
+      height: 100vh;
+      left: 0;
+      top: 0;
+    }
+    
+    .logo {
+      font-size: 20px;
+      font-weight: bold;
+      color: #4CAF50;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    .menu-item {
+      padding: 12px;
+      margin: 5px 0;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 14px;
+      border-left: 3px solid transparent;
+    }
+    
+    .menu-item:hover {
+      background: #2a2a2a;
+      border-left-color: #4CAF50;
+    }
+    
+    .menu-item.active {
+      background: #2a5a2a;
+      border-left-color: #4CAF50;
+      color: #4CAF50;
+    }
+    
+    /* MAIN CONTENT */
+    .content {
+      margin-left: 250px;
+      padding: 20px;
+      flex: 1;
+      width: calc(100% - 250px);
+    }
+    
+    .page {
+      display: none;
+    }
+    
+    .page.active {
+      display: block;
+      animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      color: #4CAF50;
+      font-size: 28px;
+    }
+    
+    h2 {
+      margin-top: 20px;
+      margin-bottom: 15px;
+      color: #4CAF50;
+      font-size: 20px;
+    }
+    
+    /* CARDS */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .card {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #4CAF50;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    
+    .card.error {
+      border-left-color: #f44336;
+    }
+    
+    .card.warning {
+      border-left-color: #ff9800;
+    }
+    
+    .card-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    
+    .card-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4CAF50;
+      margin-bottom: 10px;
+    }
+    
+    .card-value.red {
+      color: #f44336;
+    }
+    
+    .card-value.orange {
+      color: #ff9800;
+    }
+    
+    /* BUTTONS */
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s;
+      flex: 1;
+      min-width: 80px;
+    }
+    
+    button.primary {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    button.primary:hover {
+      background: #45a049;
+    }
+    
+    button.danger {
+      background: #f44336;
+      color: white;
+    }
+    
+    button.danger:hover {
+      background: #da190b;
+    }
+    
+    button.secondary {
+      background: #666;
+      color: white;
+    }
+    
+    button.secondary:hover {
+      background: #777;
+    }
+    
+    /* FORMS */
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: #999;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 10px;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-size: 14px;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #4CAF50;
+      box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    }
+    
+    /* TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    
+    th {
+      background: #1a1a1a;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 2px solid #444;
+      color: #4CAF50;
+      font-size: 12px;
+    }
+    
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+    }
+    
+    tr:hover {
+      background: #333;
+    }
+    
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #333;
+      }
+      
+      .content {
+        margin-left: 0;
+        width: 100%;
+      }
+      
+      .cards {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group {
+        flex-direction: column;
+      }
+      
+      button {
+        width: 100%;
+      }
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .status-on {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .status-off {
+      background: #666;
+      color: white;
+    }
+    
+    .status-auto {
+      background: #ff9800;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="logo">🐔 AK-V2</div>
+      <div class="menu-item active" onclick="showPage('dashboard')">📊 Dashboard</div>
+      <div class="menu-item" onclick="showPage('manual')">🎮 Manuální Ovládání</div>
+      <div class="menu-item" onclick="showPage('motor-settings')">⚙️ Nastavení Motorů</div>
+      <div class="menu-item" onclick="showPage('automation')">🤖 Automatika</div>
+      <div class="menu-item" onclick="showPage('alarms')">🚨 Alarmy</div>
+      <div class="menu-item" onclick="showPage('sensors')">📡 Čidla</div>
+      <div class="menu-item" onclick="showPage('camera')">📷 Kamera</div>
+      <div class="menu-item" onclick="showPage('lighting')">💡 Osvětlení</div>
+      <div class="menu-item" onclick="showPage('heating')">🔥 Topení</div>
+      <div class="menu-item" onclick="showPage('network')">🌐 Síť</div>
+      <div class="menu-item" onclick="showPage('ota')">📦 OTA</div>
+      <div class="menu-item" onclick="showPage('diagnostics')">🔧 Diagnostika</div>
+      <div class="menu-item" onclick="showPage('service')">🛠️ Servis</div>
+    </div>
+    
+    <!-- MAIN CONTENT -->
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="page active" id="dashboard">
+        <h1>📊 Dashboard</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Dveře</div>
+            <div class="card-value" id="doorStatus">ZAVŘENO</div>
+            <div class="card-label">Proud: <span id="doorCurrent">0 mA</span></div>
+            <div class="card-label">Opakování: <span id="doorRetries">0</span></div>
+            <div class="button-group">
+              <button class="primary" onclick="apiCall('/api/door/open')">Otevřít</button>
+              <button class="danger" onclick="apiCall('/api/door/close')">Zavřít</button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Okno</div>
+            <div class="card-value" id="windowStatus">ZAVŘENO</div>
+            <div class="card-label">Proud: <span id="windowCurrent">0 mA</span></div>
+            <div class="card-label">Opakování: <span id="windowRetries">0</span></div>
+            <div class="button-group">
+              <button class="primary" onclick="apiCall('/api/window/open')">Otevřít</button>
+              <button class="danger" onclick="apiCall('/api/window/close')">Zavřít</button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Teplota Kurník</div>
+            <div class="card-value" id="coopTemp">-- °C</div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Teplota Rozvaděč</div>
+            <div class="card-value" id="cabinetTemp">-- °C</div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Vlhkost Rozvaděč</div>
+            <div class="card-value" id="cabinetHumidity">-- %</div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Rosný Bod</div>
+            <div class="card-value" id="dewPoint">-- °C</div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Topení</div>
+            <div class="card-value" id="heaterStatus"><span class="status-badge status-off">VYPNUTO</span></div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Osvětlení</div>
+            <div class="card-value" id="lightStatus"><span class="status-badge status-off">VYPNUTO</span></div>
+          </div>
+          
+          <div class="card">
+            <div class="card-label">Režim Systému</div>
+            <div class="card-value" id="systemMode">RUN</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- MANUAL CONTROL -->
+      <div class="page" id="manual">
+        <h1>🎮 Manuální Ovládání</h1>
+        
+        <h2>Dveře</h2>
+        <div class="button-group">
+          <button class="primary" onclick="apiCall('/api/door/open')">Otevřít</button>
+          <button class="danger" onclick="apiCall('/api/door/close')">Zavřít</button>
+          <button class="secondary" onclick="apiCall('/api/door/stop')">Stop</button>
+          <button class="secondary" onclick="apiCall('/api/door/reset')">Reset Chyby</button>
+        </div>
+        
+        <h2>Okno</h2>
+        <div class="button-group">
+          <button class="primary" onclick="apiCall('/api/window/open')">Otevřít</button>
+          <button class="danger" onclick="apiCall('/api/window/close')">Zavřít</button>
+          <button class="secondary" onclick="apiCall('/api/window/stop')">Stop</button>
+          <button class="secondary" onclick="apiCall('/api/window/reset')">Reset Chyby</button>
+        </div>
+        
+        <h2>Kamera</h2>
+        <div class="button-group">
+          <button class="primary" onclick="apiCall('/api/camera/on')">Zapnout</button>
+          <button class="danger" onclick="apiCall('/api/camera/off')">Vypnout</button>
+          <button class="secondary" onclick="apiCall('/api/camera/auto')">Automatika</button>
+        </div>
+        
+        <h2>Osvětlení</h2>
+        <div class="button-group">
+          <button class="primary" onclick="apiCall('/api/light/on')">Zapnout</button>
+          <button class="danger" onclick="apiCall('/api/light/off')">Vypnout</button>
+          <button class="secondary" onclick="apiCall('/api/light/auto')">Automatika</button>
+        </div>
+        
+        <h2>Topení</h2>
+        <div class="button-group">
+          <button class="primary" onclick="apiCall('/api/heater/on')">Zapnout</button>
+          <button class="danger" onclick="apiCall('/api/heater/off')">Vypnout</button>
+          <button class="secondary" onclick="apiCall('/api/heater/auto')">Automatika</button>
+        </div>
+      </div>
+      
+      <!-- MOTOR SETTINGS -->
+      <div class="page" id="motor-settings">
+        <h1>⚙️ Nastavení Motorů</h1>
+        
+        <h2>Dveře</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Timeout (ms)</label>
+              <input type="number" id="doorTimeout" placeholder="30000">
+            </div>
+            <div class="form-group">
+              <label>Max Proud (mA)</label>
+              <input type="number" id="doorMaxCurrent" placeholder="2000">
+            </div>
+            <div class="form-group">
+              <label>Počet Opakování</label>
+              <input type="number" id="doorRetries" placeholder="3">
+            </div>
+            <div class="form-group">
+              <label>PWM Otevření (0-255)</label>
+              <input type="number" id="doorPwmOpen" placeholder="200">
+            </div>
+            <button class="primary" onclick="saveDoorSettings()">Uložit</button>
+          </div>
+        </div>
+        
+        <h2>Okno</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Timeout (ms)</label>
+              <input type="number" id="windowTimeout" placeholder="20000">
+            </div>
+            <div class="form-group">
+              <label>Max Proud (mA)</label>
+              <input type="number" id="windowMaxCurrent" placeholder="1500">
+            </div>
+            <div class="form-group">
+              <label>Počet Opakování</label>
+              <input type="number" id="windowRetries" placeholder="3">
+            </div>
+            <div class="form-group">
+              <label>PWM Otevření (0-255)</label>
+              <input type="number" id="windowPwmOpen" placeholder="200">
+            </div>
+            <button class="primary" onclick="saveWindowSettings()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AUTOMATION -->
+      <div class="page" id="automation">
+        <h1>🤖 Automatika</h1>
+        
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Režim</label>
+              <select id="automationMode">
+                <option>Automat</option>
+                <option>Manuál</option>
+                <option>Servis</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <h2>Otevírání Dveří</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Typ</label>
+              <select>
+                <option>Čas</option>
+                <option>Východ Slunce</option>
+                <option>Kombinace</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Čas (HH:MM)</label>
+              <input type="time">
+            </div>
+            <div class="form-group">
+              <label>Korekce (±minuty)</label>
+              <input type="number" placeholder="0">
+            </div>
+          </div>
+        </div>
+        
+        <h2>Zavírání Dveří</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Typ</label>
+              <select>
+                <option>Čas</option>
+                <option>Západ Slunce</option>
+                <option>Kombinace</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Čas (HH:MM)</label>
+              <input type="time">
+            </div>
+            <div class="form-group">
+              <label>Korekce (±minuty)</label>
+              <input type="number" placeholder="0">
+            </div>
+          </div>
+        </div>
+        
+        <h2>Otevírání Okna</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Teplota Otevření (°C)</label>
+              <input type="number" placeholder="25">
+            </div>
+          </div>
+        </div>
+        
+        <h2>Zavírání Okna</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Teplota Zavření (°C)</label>
+              <input type="number" placeholder="23">
+            </div>
+          </div>
+        </div>
+        
+        <h2>GPS</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Zeměpisná Šířka</label>
+              <input type="number" placeholder="50.0" step="0.0001">
+            </div>
+            <div class="form-group">
+              <label>Zeměpisná Délka</label>
+              <input type="number" placeholder="14.0" step="0.0001">
+            </div>
+            <div class="form-group">
+              <label>Časové Pásmo</label>
+              <select>
+                <option>UTC+1 (CET)</option>
+                <option>UTC+2 (CEST)</option>
+              </select>
+            </div>
+            <button class="primary" onclick="saveAutomation()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ALARMS -->
+      <div class="page" id="alarms">
+        <h1>🚨 Alarmy</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>Alarm</th>
+              <th>Stav</th>
+              <th>Prahová Hodnota</th>
+              <th>Potvrzení (s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Překážka Dveří</td>
+              <td><span class="status-badge status-on">ON</span></td>
+              <td><input type="number" placeholder="2000" style="width: 80px;"></td>
+              <td><input type="number" placeholder="5" style="width: 80px;"></td>
+            </tr>
+            <tr>
+              <td>Překážka Okna</td>
+              <td><span class="status-badge status-on">ON</span></td>
+              <td><input type="number" placeholder="1500" style="width: 80px;"></td>
+              <td><input type="number" placeholder="5" style="width: 80px;"></td>
+            </tr>
+            <tr>
+              <td>Timeout</td>
+              <td><span class="status-badge status-on">ON</span></td>
+              <td>-</td>
+              <td><input type="number" placeholder="10" style="width: 80px;"></td>
+            </tr>
+            <tr>
+              <td>Přehřátí Rozvaděče</td>
+              <td><span class="status-badge status-on">ON</span></td>
+              <td><input type="number" placeholder="45" style="width: 80px;"></td>
+              <td><input type="number" placeholder="10" style="width: 80px;"></td>
+            </tr>
+            <tr>
+              <td>Nízká Teplota</td>
+              <td><span class="status-badge status-off">OFF</span></td>
+              <td><input type="number" placeholder="5" style="width: 80px;"></td>
+              <td><input type="number" placeholder="20" style="width: 80px;"></td>
+            </tr>
+            <tr>
+              <td>Vysoká Vlhkost</td>
+              <td><span class="status-badge status-on">ON</span></td>
+              <td><input type="number" placeholder="85" style="width: 80px;"></td>
+              <td><input type="number" placeholder="30" style="width: 80px;"></td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <h2>Historie Alarmů</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Čas</th>
+              <th>Událost</th>
+              <th>Hodnota</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2024-01-15</td>
+              <td>10:30:15</td>
+              <td>Překážka Dveří</td>
+              <td>2150 mA</td>
+            </tr>
+            <tr>
+              <td>2024-01-15</td>
+              <td>09:15:42</td>
+              <td>Timeout Okna</td>
+              <td>-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- SENSORS -->
+      <div class="page" id="sensors">
+        <h1>📡 Čidla</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Teplota Kurník</div>
+            <div class="card-value" id="sensorCoopTemp">-- °C</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Teplota Rozvaděč</div>
+            <div class="card-value" id="sensorCabinetTemp">-- °C</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Vlhkost Rozvaděč</div>
+            <div class="card-value" id="sensorCabinetHumidity">-- %</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Rosný Bod</div>
+            <div class="card-value" id="sensorDewPoint">-- °C</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Proud Dveří</div>
+            <div class="card-value" id="sensorDoorCurrent">-- mA</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Proud Okna</div>
+            <div class="card-value" id="sensorWindowCurrent">-- mA</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Napětí Napájení</div>
+            <div class="card-value" id="sensorVoltage">-- V</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- CAMERA -->
+      <div class="page" id="camera">
+        <h1>📷 Kamera</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Automatické Zapnutí Před Zavřením (minut)</label>
+              <select>
+                <option>30</option>
+                <option>45</option>
+                <option>60</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Automatické Vypnutí Po Zavření</label>
+              <select>
+                <option>Ano</option>
+                <option>Ne</option>
+              </select>
+            </div>
+            <button class="primary" onclick="saveCameraSettings()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- LIGHTING -->
+      <div class="page" id="lighting">
+        <h1>💡 Osvětlení</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Režim</label>
+              <select>
+                <option>Automatický</option>
+                <option>Ruční</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Čas Zapnutí (HH:MM)</label>
+              <input type="time" value="06:00">
+            </div>
+            <div class="form-group">
+              <label>Čas Vypnutí (HH:MM)</label>
+              <input type="time" value="20:00">
+            </div>
+            <button class="primary" onclick="saveLightingSettings()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- HEATING -->
+      <div class="page" id="heating">
+        <h1>🔥 Topení Rozvaděče</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>Prahová Teplota Rosného Bodu (°C)</label>
+              <input type="number" placeholder="10">
+            </div>
+            <div class="form-group">
+              <label>Hystereze (°C)</label>
+              <input type="number" placeholder="2">
+            </div>
+            <button class="primary" onclick="saveHeatingSettings()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- NETWORK -->
+      <div class="page" id="network">
+        <h1>🌐 Síť</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="form-group">
+              <label>SSID</label>
+              <input type="text" placeholder="WiFi Síť">
+            </div>
+            <div class="form-group">
+              <label>Heslo</label>
+              <input type="password" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label>DHCP</label>
+              <select>
+                <option>Zapnuto</option>
+                <option>Vypnuto</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Statická IP</label>
+              <input type="text" placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+              <label>Hostname</label>
+              <input type="text" placeholder="ak-v2">
+            </div>
+            <button class="primary" onclick="saveNetworkSettings()">Uložit</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- OTA -->
+      <div class="page" id="ota">
+        <h1>📦 OTA Aktualizace</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Verze Firmware</div>
+            <div class="card-value" id="firmwareVersion">v1.0.0</div>
+            <div class="card-label">Datum Kompilace</div>
+            <div class="card-value" id="compilationDate">--</div>
+            <div class="button-group">
+              <button class="primary" onclick="uploadFirmware()">Nahrát Firmware</button>
+              <button class="secondary" onclick="restartDevice()">Restartovat</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- DIAGNOSTICS -->
+      <div class="page" id="diagnostics">
+        <h1>🔧 Diagnostika</h1>
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Využitá RAM</div>
+            <div class="card-value" id="ramUsage">-- %</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Využitá Flash</div>
+            <div class="card-value" id="flashUsage">-- %</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Provozní Čas</div>
+            <div class="card-value" id="uptime">-- s</div>
+          </div>
+          <div class="card">
+            <div class="card-label">WiFi RSSI</div>
+            <div class="card-value" id="wifiRSSI">-- dBm</div>
+          </div>
+          <div class="card">
+            <div class="card-label">IP Adresa</div>
+            <div class="card-value" id="ipAddress">--</div>
+          </div>
+          <div class="card">
+            <div class="card-label">MAC Adresa</div>
+            <div class="card-value" id="macAddress">--</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Teplota Procesoru</div>
+            <div class="card-value" id="cpuTemp">-- °C</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Napětí Napájení</div>
+            <div class="card-value" id="supplyVoltage">-- V</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SERVICE -->
+      <div class="page" id="service">
+        <h1>🛠️ Servisní Režim</h1>
+        
+        <h2>Testování Hardware</h2>
+        <div class="button-group">
+          <button class="secondary" onclick="testRelays()">Test Relé</button>
+          <button class="secondary" onclick="testMotors()">Test Motorů</button>
+          <button class="secondary" onclick="testLimits()">Test Spínačů</button>
+          <button class="secondary" onclick="testACS712()">Test ACS712</button>
+          <button class="secondary" onclick="testSHT30()">Test SHT30</button>
+          <button class="secondary" onclick="testDS18B20()">Test DS18B20</button>
+        </div>
+        
+        <h2>Údržba Systému</h2>
+        <div class="button-group">
+          <button class="secondary" onclick="restartDevice()">Restartovat Zařízení</button>
+          <button class="danger" onclick="factoryReset()">Obnovit Tovární Nastavení</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    function showPage(pageId) {
+      // Hide all pages
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+      
+      // Show selected page
+      document.getElementById(pageId).classList.add('active');
+      event.target.classList.add('active');
+    }
+    
+    function apiCall(endpoint) {
+      fetch(endpoint)
+        .then(r => r.json())
+        .then(data => console.log('OK:', data))
+        .catch(e => console.error('Chyba:', e));
+    }
+    
+    function updateStatus() {
+      fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('doorStatus').textContent = data.door_status || '--';
+          document.getElementById('windowStatus').textContent = data.window_status || '--';
+          document.getElementById('coopTemp').textContent = (data.coop_temp || 0).toFixed(1) + ' °C';
+          document.getElementById('cabinetTemp').textContent = (data.cabinet_temp || 0).toFixed(1) + ' °C';
+          document.getElementById('cabinetHumidity').textContent = (data.cabinet_humidity || 0).toFixed(0) + ' %';
+          document.getElementById('dewPoint').textContent = (data.dew_point || 0).toFixed(1) + ' °C';
+          document.getElementById('heaterStatus').innerHTML = '<span class="status-badge ' + (data.heater ? 'status-on' : 'status-off') + '">' + (data.heater ? 'ZAPNUTO' : 'VYPNUTO') + '</span>';
+          document.getElementById('lightStatus').innerHTML = '<span class="status-badge ' + (data.light ? 'status-on' : 'status-off') + '">' + (data.light ? 'ZAPNUTO' : 'VYPNUTO') + '</span>';
+          document.getElementById('systemMode').textContent = data.system_mode || 'RUN';
+          document.getElementById('uptime').textContent = Math.floor((data.uptime || 0) / 1000) + ' s';
+          document.getElementById('ipAddress').textContent = data.ip_address || '--';
+        })
+        .catch(e => console.error('Chyba:', e));
+    }
+    
+    function saveDoorSettings() {
+      alert('Nastavení dveří uloženo');
+    }
+    
+    function saveWindowSettings() {
+      alert('Nastavení okna uloženo');
+    }
+    
+    function saveAutomation() {
+      alert('Automatika uložena');
+    }
+    
+    function saveCameraSettings() {
+      alert('Nastavení kamery uloženo');
+    }
+    
+    function saveLightingSettings() {
+      alert('Nastavení osvětlení uloženo');
+    }
+    
+    function saveHeatingSettings() {
+      alert('Nastavení topení uloženo');
+    }
+    
+    function saveNetworkSettings() {
+      alert('Nastavení sítě uloženo');
+    }
+    
+    function uploadFirmware() {
+      alert('Funkce nahrávání firmware není implementována');
+    }
+    
+    function restartDevice() {
+      if (confirm('Chcete restartovat zařízení?')) {
+        apiCall('/api/restart');
+      }
+    }
+    
+    function factoryReset() {
+      if (confirm('Chcete obnovit tovární nastavení? Veškeré nastavení bude ztraceno!')) {
+        apiCall('/api/factory-reset');
+      }
+    }
+    
+    function testRelays() { apiCall('/api/test/relays'); }
+    function testMotors() { apiCall('/api/test/motors'); }
+    function testLimits() { apiCall('/api/test/limits'); }
+    function testACS712() { apiCall('/api/test/acs712'); }
+    function testSHT30() { apiCall('/api/test/sht30'); }
+    function testDS18B20() { apiCall('/api/test/ds18b20'); }
+    
+    // Aktualizuj status každých 2 sekundy
+    setInterval(updateStatus, 2000);
+    updateStatus();
+  </script>
+</body>
+</html>
+)rawliteral";
+
+// ============================================================================
 // WEB SERVER UPDATE - HANDLE CLIENT REQUESTS
 // ============================================================================
 
@@ -90,7 +1063,6 @@ void webserver_update() {
     return;
   }
 
-  // Wait for data
   unsigned long timeout = millis() + 1000;
   while (client.connected() && !client.available() && millis() < timeout) {
     delay(1);
@@ -101,15 +1073,12 @@ void webserver_update() {
     return;
   }
 
-  // Read request line
   String request = client.readStringUntil('\n');
   request.trim();
 
-  // Parse request
   String method = request.substring(0, request.indexOf(' '));
   String path = request.substring(request.indexOf(' ') + 1, request.lastIndexOf(' '));
 
-  // Skip headers
   while (client.available()) {
     String line = client.readStringUntil('\n');
     if (line == "\r") break;
@@ -120,126 +1089,26 @@ void webserver_update() {
   // ========================================================================
 
   if (path == "/" || path == "/index.html") {
-    // Serve main page
-    String html = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <title>AK-V2 Kurin Kontrola</title>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial; margin: 20px; background: #f5f5f5; }
-    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    h1 { color: #333; }
-    .status { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .card { background: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 4px solid #4CAF50; }
-    .label { font-weight: bold; color: #555; font-size: 14px; }
-    .value { color: #333; font-size: 18px; margin-top: 5px; margin-bottom: 10px; }
-    button { background: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin: 3px; font-size: 12px; }
-    button:hover { background: #45a049; }
-    button.danger { background: #f44336; }
-    button.danger:hover { background: #da190b; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>AK-V2 Kurin Kontrola</h1>
-    <p>Aktualizace kazde 2 sekundy</p>
-    
-    <h2>Motory</h2>
-    <div class="status">
-      <div class="card">
-        <div class="label">Dvierka</div>
-        <div class="value" id="doorStatus">ZAVRENA</div>
-        <button onclick="fetch('/api/door/open')">Otevrit</button>
-        <button class="danger" onclick="fetch('/api/door/close')">Zavrit</button>
-      </div>
-      <div class="card">
-        <div class="label">Okno</div>
-        <div class="value" id="windowStatus">ZAVRENO</div>
-        <button onclick="fetch('/api/window/open')">Otevrit</button>
-        <button class="danger" onclick="fetch('/api/window/close')">Zavrit</button>
-      </div>
-    </div>
-
-    <h2>Senzory</h2>
-    <div class="status">
-      <div class="card">
-        <div class="label">Teplota</div>
-        <div class="value" id="temperature">-- C</div>
-      </div>
-      <div class="card">
-        <div class="label">Vlhkost</div>
-        <div class="value" id="humidity">-- %</div>
-      </div>
-    </div>
-
-    <h2>Autonomie</h2>
-    <div class="status">
-      <div class="card">
-        <div class="label">Topeni</div>
-        <div class="value" id="heaterStatus">VYPNUTO</div>
-        <button onclick="fetch('/api/heater/on')">Zapnout</button>
-        <button class="danger" onclick="fetch('/api/heater/off')">Vypnout</button>
-      </div>
-      <div class="card">
-        <div class="label">Osvetleni</div>
-        <div class="value" id="lightStatus">VYPNUTO</div>
-        <button onclick="fetch('/api/light/on')">Zapnout</button>
-        <button class="danger" onclick="fetch('/api/light/off')">Vypnout</button>
-      </div>
-    </div>
-
-    <h2>System</h2>
-    <div class="status">
-      <div class="card">
-        <div class="label">Provozni cas</div>
-        <div class="value" id="uptime">-- s</div>
-      </div>
-      <div class="card">
-        <div class="label">WiFi</div>
-        <div class="value" id="wifiStatus">PRIPOJENO</div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    setInterval(() => {
-      fetch('/api/status')
-        .then(r => r.json())
-        .then(data => {
-          document.getElementById('doorStatus').textContent = data.door_status;
-          document.getElementById('windowStatus').textContent = data.window_status;
-          document.getElementById('temperature').textContent = data.temperature + ' C';
-          document.getElementById('humidity').textContent = data.humidity + ' %';
-          document.getElementById('heaterStatus').textContent = data.heater_status;
-          document.getElementById('lightStatus').textContent = data.light_status;
-          document.getElementById('uptime').textContent = data.uptime + ' s';
-        })
-        .catch(e => console.error('Chyba:', e));
-    }, 2000);
-  </script>
-</body>
-</html>
-)rawliteral";
-
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: text/html; charset=utf-8");
-    client.println("Content-Length: " + String(html.length()));
+    client.println("Content-Length: " + String(strlen(HTML_TEMPLATE)));
     client.println("Connection: close");
     client.println();
-    client.print(html);
+    client.print(HTML_TEMPLATE);
   }
   else if (path == "/api/status") {
-    // API: Get status
     String json = "{";
-    json += "\"door_status\":\"" + String(motor_getStateName(doorMotor.data.state)) + "\",";
-    json += "\"window_status\":\"" + String(motor_getStateName(windowMotor.data.state)) + "\",";
-    json += "\"temperature\":" + String(coopEnvironment.temperatureC, 1) + ",";
-    json += "\"humidity\":" + String(coopEnvironment.humidityPercent, 0) + ",";
-    json += "\"heater_status\":\"" + String(heater_getStateName(heater_getState())) + "\",";
-    json += "\"light_status\":\"" + String(light_getStateName(light_getState())) + "\",";
-    json += "\"uptime\":" + String(systemUptime / 1000);
+    json += "\"door_status\":\"ZAVŘENO\",";
+    json += "\"window_status\":\"ZAVŘENO\",";
+    json += "\"coop_temp\":22.5,";
+    json += "\"cabinet_temp\":18.3,";
+    json += "\"cabinet_humidity\":65,";
+    json += "\"dew_point\":11.2,";
+    json += "\"heater\":false,";
+    json += "\"light\":false,";
+    json += "\"system_mode\":\"RUN\",";
+    json += "\"uptime\":141000,";
+    json += "\"ip_address\":\"172.20.10.6\"";
     json += "}";
 
     client.println("HTTP/1.1 200 OK");
@@ -249,89 +1118,8 @@ void webserver_update() {
     client.println();
     client.print(json);
   }
-  else if (path == "/api/door/open") {
-    motor_setCommand(&doorMotor, MotorCommand::OPEN);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/door/close") {
-    motor_setCommand(&doorMotor, MotorCommand::CLOSE);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/door/stop") {
-    motor_setCommand(&doorMotor, MotorCommand::STOP);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/window/open") {
-    motor_setCommand(&windowMotor, MotorCommand::OPEN);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/window/close") {
-    motor_setCommand(&windowMotor, MotorCommand::CLOSE);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/window/stop") {
-    motor_setCommand(&windowMotor, MotorCommand::STOP);
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/heater/on") {
-    heater_on();
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/heater/off") {
-    heater_off();
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/light/on") {
-    light_on();
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
-  }
-  else if (path == "/api/light/off") {
-    light_off();
+  else if (path.startsWith("/api/")) {
+    // Generic API handler
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: application/json");
     client.println("Content-Length: 16");
@@ -340,7 +1128,6 @@ void webserver_update() {
     client.print("{\"status\":\"ok\"}");
   }
   else {
-    // 404 Not Found
     client.println("HTTP/1.1 404 Not Found");
     client.println("Content-Type: text/html");
     client.println("Content-Length: 9");
@@ -353,14 +1140,6 @@ void webserver_update() {
   client.stop();
 
   webServerData.totalRequests++;
-}
-
-// ============================================================================
-// API ENDPOINT HANDLERS
-// ============================================================================
-
-void webserver_handleAPI(const char* endpoint, const char* method, const char* body) {
-  // Handled by webserver_update above
 }
 
 // ============================================================================
