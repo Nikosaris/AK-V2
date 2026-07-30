@@ -4,7 +4,7 @@
 #include "Heater.h"
 #include "Light.h"
 #include "Globals.h"
-#include <WebServer.h>
+#include <ESP32WebServer.h>
 
 // ============================================================================
 // WEB SERVER INSTANCE - GLOBAL DATA
@@ -12,7 +12,7 @@
 
 WebServerData webServerData;
 static WebServerConfig webServerConfig;
-static WebServer* server = nullptr;
+static ESP32WebServer* server = nullptr;
 
 // Forward declarations for external motor instances
 extern Motor doorMotor;
@@ -39,7 +39,7 @@ void webserver_init() {
   strcpy(webServerConfig.adminPassword, "");
 
   // Create web server instance
-  server = new WebServer(80);
+  server = new ESP32WebServer(80);
 }
 
 // ============================================================================
