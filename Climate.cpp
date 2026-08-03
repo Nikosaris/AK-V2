@@ -152,7 +152,7 @@ void climate_init() {
   climateData.isNight = false;
   climateData.lastUpdateMs = millis();
 
-  // Set default configuration (GPS defaults = Prague, CET)
+  // Set default configuration (upravit zde pevné souřadnice a časové pásmo)
   climateConfig.mode = ClimateMode::MANUAL;
   climateConfig.sunriseHour = 6;
   climateConfig.sunriseMinute = 0;
