@@ -131,9 +131,15 @@ void setup() {
   networkInitTimeMs = millis();
   if (AKV2_USE_ETHERNET_PRIMARY && ethernet_connect()) {
     Serial.println("[NET] Ethernet W5500 initialization started (primary)");
+    rtc_syncNTP();
+    Serial.println("[INIT] NTP time synchronized");
   } else {
     Serial.println("[NET] Ethernet init failed, trying WiFi fallback");
     tryWiFiFallback();
+    if (wifi_isConnected()) {
+      rtc_syncNTP();
+      Serial.println("[INIT] NTP time synchronized via WiFi");
+    }
   }
 
   // Initialize motor structures
