@@ -77,3 +77,21 @@ STOPPED → OPENING/CLOSING → (OBSTACLE/TIMEOUT) → ERROR/RETRY
 
 ## Version
 v0.2.0 - W5500 Ethernet primary, WiFi fallback and updated pin map
+
+## Standalone Module Test Sketches
+
+For module-by-module debugging through web buttons, use these standalone sketches:
+
+- `module_tests/AKV2_Test_Sensors/AKV2_Test_Sensors.ino`
+  - Coop temperature + cabinet temperature/humidity display
+  - Web calibration offsets for each measured value
+- `module_tests/AKV2_Test_Relays/AKV2_Test_Relays.ino`
+  - Manual ON/OFF relay testing only (camera/heater/light)
+- `module_tests/AKV2_Test_Limits/AKV2_Test_Limits.ino`
+  - Door/window limit sensor state evaluation
+- `module_tests/AKV2_Test_DoorManual/AKV2_Test_DoorManual.ino`
+  - Manual door drive OPEN/CLOSE/STOP over web buttons
+- `module_tests/AKV2_Test_VentManual/AKV2_Test_VentManual.ino`
+  - Manual ventilation drive OPEN/CLOSE/STOP over web buttons
+
+Each test sketch starts its own AP and serves a minimal local web UI.
