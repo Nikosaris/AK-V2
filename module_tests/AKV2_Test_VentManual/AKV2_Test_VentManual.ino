@@ -1,8 +1,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
-constexpr const char* AP_SSID = "AKV2-VENT-TEST";
-constexpr const char* AP_PASSWORD = "12345678";
+constexpr const char* WIFI_SSID = "iPhone (2)";
+constexpr const char* WIFI_PASS = "YOUR_HOTSPOT_PASSWORD";  // Fill in before uploading
 
 constexpr uint8_t WINDOW_IN1_PIN = 32;
 constexpr uint8_t WINDOW_IN2_PIN = 33;
@@ -60,9 +60,14 @@ void setup() {
   pinMode(WINDOW_IN2_PIN, OUTPUT);
   ventStop();
 
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(AP_SSID, AP_PASSWORD);
-  delay(500);  // Wait for AP to assign IP before starting server
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("[VENT] Connecting to hotspot");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
 
   server.on("/", []() { server.send(200, "text/html", HTML); });
   server.on("/api/status", []() { server.send(200, "application/json", statusJson()); });
@@ -71,8 +76,8 @@ void setup() {
   server.on("/api/vent/stop", []() { ventStop(); server.send(200, "application/json", "{\"ok\":true}"); });
   server.begin();
 
-  Serial.print("[VENT] AP IP: ");
-  Serial.println(WiFi.softAPIP());
+  Serial.print("[VENT] IP: ");
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {
