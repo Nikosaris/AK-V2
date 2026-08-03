@@ -20,6 +20,36 @@
 #include "WiFi.h"
 #include <cstring>
 
+// Compatibility declarations for Arduino builds where local headers differ
+extern Motor doorMotor;
+extern Motor windowMotor;
+
+void wifi_init();
+void wifi_update();
+bool wifi_connect(const char* ssid, const char* password);
+bool wifi_isConnected();
+const char* wifi_getLocalIP();
+
+#ifndef NETWORK_USE_ETHERNET_PRIMARY
+constexpr bool NETWORK_USE_ETHERNET_PRIMARY = true;
+#endif
+
+#ifndef NETWORK_USE_WIFI_FALLBACK
+constexpr bool NETWORK_USE_WIFI_FALLBACK = true;
+#endif
+
+#ifndef WIFI_DEBUG_SSID
+constexpr const char* WIFI_DEBUG_SSID = "";
+#endif
+
+#ifndef WIFI_DEBUG_PASSWORD
+constexpr const char* WIFI_DEBUG_PASSWORD = "";
+#endif
+
+#ifndef ETHERNET_WIFI_FALLBACK_DELAY_MS
+constexpr uint32_t ETHERNET_WIFI_FALLBACK_DELAY_MS = 10000;
+#endif
+
 // ============================================================================
 // MOTOR INSTANCES
 // ============================================================================
@@ -36,7 +66,7 @@ static void tryWiFiFallback() {
     return;
   }
 
-  if (!wifi_isConnected() && wifi_getState() != WiFiState::CONNECTING) {
+  if (!wifi_isConnected()) {
     wifi_connect(WIFI_DEBUG_SSID, WIFI_DEBUG_PASSWORD);
     Serial.println("[NET] WiFi fallback connect requested");
   }
