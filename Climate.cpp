@@ -15,128 +15,202 @@ extern Motor doorMotor;
 extern Motor windowMotor;
 
 // ============================================================================
-// SUN TIME CALCULATION (Simplified NOAA algorithm)
-// Accurate to ±1-2 minutes for mid-latitudes.
-// Returns time in minutes from midnight (local time).
-// Returns -1 if sun never rises/sets (polar day/night).
+// SUN TIME CALCULATION
 //
-// NOTE: All intermediate JD arithmetic is done in double to avoid float32
-// precision loss. A 32-bit float has only ~7 significant digits; JD values
-// near 2,451,545 lose the fractional part to rounding steps of 0.25
-// (= 6 h), producing errors of ±90 minutes. Using double fixes this.
+// Algorithm based on Dusk2Dawn library (R.J. Salmon), which implements the
+// NOAA Solar Calculator equations:
+//   https://www.esrl.noaa.gov/gmd/grad/solcalc/
+//
+// Accuracy: ±1 minute for mid-latitudes (matches project requirement).
+//
+// All intermediate Julian Day (JD) arithmetic is performed in double to
+// avoid float32 precision loss.  A 32-bit float has only ~7 significant
+// digits; JD values near 2,451,545 lose sub-day resolution in steps of
+// ~0.25 JD (= 6 h), causing errors up to ±90 minutes.
 // ============================================================================
 
-static const double DEG2RAD_D = M_PI / 180.0;
+static const double D2R = M_PI / 180.0; // degrees → radians
 
-// Return 1 if EU summer time (DST) is in effect on the given date, else 0.
-// EU rule: DST starts last Sunday of March at 01:00 UTC,
-//          ends   last Sunday of October at 01:00 UTC.
-static int climate_isDST_EU(uint16_t year, uint8_t month, uint8_t day) {
+// ---------------------------------------------------------------------------
+// Gregorian calendar → Julian Day Number (double precision)
+// ---------------------------------------------------------------------------
+static double jdn(uint16_t year, uint8_t month, uint8_t day) {
+  if (month <= 2) { year -= 1; month += 12; }
+  int A = (int)(year / 100);
+  int B = 2 - A + (int)(A / 4);
+  return floor(365.25 * (year + 4716)) + floor(30.6001 * (month + 1)) + day + B - 1524.5;
+}
+
+// ---------------------------------------------------------------------------
+// EU DST detection
+// Returns 1 if summer time (CEST) is active on the given date, else 0.
+// Rule: starts last Sunday of March 01:00 UTC, ends last Sunday of October 01:00 UTC.
+// ---------------------------------------------------------------------------
+static int isDST(uint16_t year, uint8_t month, uint8_t day) {
   if (month < 3 || month > 10) return 0;
   if (month > 3 && month < 10) return 1;
-
-  // Find day-of-week of the 31st (or 30th for April/Sept) of the month.
-  // Zeller's formula for day-of-week (0=Sun … 6=Sat):
-  uint8_t checkDay = 31; // both March and October have 31 days
-  // Tomohiko Sakamoto's algorithm
+  // Tomohiko Sakamoto's weekday algorithm (0 = Sunday).
+  // We need the day-of-week of the 31st of the month (both March and October have 31 days).
+  // t[] offset table indexed by month-1.
   static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
-  uint16_t y = year - (checkDay < 3 ? 1 : 0);
-  uint8_t dow31 = (y + y/4 - y/100 + y/400 + t[checkDay-1] + checkDay) % 7;
-  // Last Sunday of month = 31 - ((dow31 == 0) ? 0 : dow31)
-  // But for March dow of day 31; last Sunday = 31 - dow31 (if dow31>0) else 31
-  uint8_t lastSun = (uint8_t)(31 - dow31);
-
+  uint16_t y = year; // day 31 >= 3, so no year adjustment needed
+  uint8_t dow31 = (uint8_t)((y + y/4 - y/100 + y/400 + t[month - 1] + 31) % 7);
+  uint8_t lastSun = (uint8_t)(31 - dow31); // last Sunday of the month (dow31==0 → 31st is Sunday)
   if (month == 3)  return (day >= lastSun) ? 1 : 0;
   else             return (day <  lastSun) ? 1 : 0;
 }
 
-// Compute Julian Day Number from calendar date (Gregorian calendar).
-// Returns a double to preserve the fractional part needed for time calculation.
-static double climate_julianDay(uint16_t year, uint8_t month, uint8_t day) {
-  if (month <= 2) {
-    year -= 1;
-    month += 12;
-  }
-  int A = (int)(year / 100);
-  int B = 2 - A + (int)(A / 4);
-  return (long)(365.25 * (year + 4716)) + (int)(30.6001 * (month + 1)) + day + B - 1524.5;
-}
-
-// Calculate sunrise or sunset in minutes from midnight (local time).
-// isSunrise = true → sunrise, false → sunset.
-// Returns -1 on failure (polar).
-static int climate_sunEvent(uint16_t year, uint8_t month, uint8_t day, bool isSunrise) {
+// ---------------------------------------------------------------------------
+// Core solar calculation (Dusk2Dawn / NOAA method)
+//
+// zenith:
+//   90.833  – standard sunrise/sunset (upper limb, atmospheric refraction)
+//    96.0   – civil twilight (6° below geometric horizon)
+//
+// Returns minutes from midnight (local time), or -1 on polar day/night.
+// ---------------------------------------------------------------------------
+static int sunEvent(uint16_t year, uint8_t month, uint8_t day,
+                    bool isSunrise, double zenith) {
   double lat = (double)climateConfig.latitude;
   double lon = (double)climateConfig.longitude;
-  // Apply DST on top of the base UTC offset stored in config
-  int tz = (int)climateConfig.timezoneOffsetH + climate_isDST_EU(year, month, day);
+  int    tz  = (int)climateConfig.timezoneOffsetH + isDST(year, month, day);
 
-  // All JD arithmetic in double to avoid float32 precision loss (~0.25 JD steps)
-  double jd = climate_julianDay(year, month, day);
-  // Work relative to J2000 epoch to keep numbers small
-  double n  = jd - 2451545.0 + 0.0008;
+  double JD = jdn(year, month, day);
 
-  double Js     = n - lon / 360.0;
-  double M      = fmod(357.5291 + 0.98560028 * Js, 360.0);
-  double C      = 1.9148 * sin(M * DEG2RAD_D)
-                + 0.0200 * sin(2.0 * M * DEG2RAD_D)
-                + 0.0003 * sin(3.0 * M * DEG2RAD_D);
-  double lambda = fmod(M + C + 180.0 + 102.9372, 360.0);
+  // Julian century relative to J2000.0
+  double t = (JD - 2451545.0) / 36525.0;
 
-  double Jt    = 2451545.0 + Js + 0.0053 * sin(M * DEG2RAD_D) - 0.0069 * sin(2.0 * lambda * DEG2RAD_D);
-  double sinD  = sin(lambda * DEG2RAD_D) * sin(23.4397 * DEG2RAD_D);
-  double cosD  = cos(asin(sinD));
+  // Geometric mean longitude of the Sun (degrees)
+  double L0 = fmod(280.46646 + t * (36000.76983 + t * 0.0003032), 360.0);
 
-  double cosH  = (sin(-0.8333 * DEG2RAD_D) - sin(lat * DEG2RAD_D) * sinD)
-                 / (cos(lat * DEG2RAD_D) * cosD);
+  // Geometric mean anomaly of the Sun (degrees)
+  double M  = fmod(357.52911 + t * (35999.05029 - t * 0.0001537), 360.0);
 
-  if (cosH < -1.0 || cosH > 1.0) {
-    return -1; // polar day or night
-  }
+  // Equation of the centre
+  double C  = sin(M * D2R) * (1.914602 - t * (0.004817 + 0.000014 * t))
+            + sin(2.0 * M * D2R) * (0.019993 - 0.000101 * t)
+            + sin(3.0 * M * D2R) * 0.000289;
 
-  double H      = acos(cosH) * (180.0 / M_PI);
-  double Jevent = isSunrise ? (Jt - H / 360.0) : (Jt + H / 360.0);
+  // Sun's true longitude and anomaly (degrees)
+  double sunLon = L0 + C;
 
-  // Extract fractional day relative to J2000 epoch (keeps value small → no precision loss)
-  double fracFromEpoch = Jevent - 2451545.0;
-  // Convert to minutes-from-midnight UTC: only the sub-day fraction matters
-  double dayFrac = fracFromEpoch - floor(fracFromEpoch);
-  int minutesUTC = (int)round(dayFrac * 1440.0) % 1440;
-  if (minutesUTC < 0) minutesUTC += 1440;
+  // Apparent longitude (correct for nutation and aberration)
+  double omega   = 125.04 - 1934.136 * t;
+  double appLon  = sunLon - 0.00569 - 0.00478 * sin(omega * D2R);
 
-  int minutesLocal = minutesUTC + tz * 60;
-  if (minutesLocal < 0)    minutesLocal += 1440;
-  if (minutesLocal >= 1440) minutesLocal -= 1440;
+  // Mean obliquity of the ecliptic
+  double meanObl = 23.0 + (26.0 + (21.448 - t * (46.8150 + t * (0.00059 - t * 0.001813))) / 60.0) / 60.0;
 
-  return minutesLocal;
+  // Corrected obliquity
+  double oblCorr = meanObl + 0.00256 * cos(omega * D2R);
+
+  // Sun's right ascension (degrees) – unused but kept for completeness
+  // double RA = atan2(cos(oblCorr * D2R) * sin(appLon * D2R), cos(appLon * D2R)) / D2R;
+
+  // Sun's declination (degrees)
+  double sinDecl = sin(oblCorr * D2R) * sin(appLon * D2R);
+  double cosDecl = cos(asin(sinDecl));
+
+  // Equation of time (minutes)
+  double e     = 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+  double y_val = pow(tan(oblCorr / 2.0 * D2R), 2.0);
+  double eqTime = 4.0 * (y_val * sin(2.0 * L0 * D2R)
+                - 2.0 * e * sin(M * D2R)
+                + 4.0 * e * y_val * sin(M * D2R) * cos(2.0 * L0 * D2R)
+                - 0.5 * y_val * y_val * sin(4.0 * L0 * D2R)
+                - 1.25 * e * e * sin(2.0 * M * D2R)) * (180.0 / M_PI);
+
+  // Hour angle of sunrise/sunset (degrees)
+  double cosHA = (cos(zenith * D2R) - sinDecl * sin(lat * D2R))
+                 / (cosDecl * cos(lat * D2R));
+
+  if (cosHA < -1.0) return -1; // polar day  (sun never sets)
+  if (cosHA >  1.0) return -1; // polar night (sun never rises)
+
+  double HA = acos(cosHA) / D2R; // 0–180°
+
+  // Solar noon in minutes (UTC)
+  double solarNoonUTC = 720.0 - 4.0 * lon - eqTime;
+
+  // Event time (UTC minutes)
+  double eventUTC = isSunrise ? (solarNoonUTC - 4.0 * HA)
+                              : (solarNoonUTC + 4.0 * HA);
+
+  // Convert to local time
+  double eventLocal = eventUTC + tz * 60.0;
+  // Wrap to [0, 1440)
+  while (eventLocal <    0.0) eventLocal += 1440.0;
+  while (eventLocal >= 1440.0) eventLocal -= 1440.0;
+
+  return (int)round(eventLocal);
 }
 
+// ---------------------------------------------------------------------------
+// Public: recalculate all sun times and effective action times
+// ---------------------------------------------------------------------------
 void climate_recalculateSunTimes(uint16_t year, uint8_t month, uint8_t day) {
-  // RTC year is 0-99 offset from 2000
-  uint16_t fullYear = (year < 100) ? (2000 + year) : year;
+  uint16_t fullYear = (year < 100) ? (uint16_t)(2000 + year) : year;
 
-  int riseMin = climate_sunEvent(fullYear, month, day, true);
-  int setMin  = climate_sunEvent(fullYear, month, day, false);
+  // Standard sunrise / sunset  (zenith = 90.833°)
+  int riseMin = sunEvent(fullYear, month, day, true,  90.833);
+  int setMin  = sunEvent(fullYear, month, day, false, 90.833);
+
+  // Civil dawn / dusk  (zenith = 96.0°)
+  int dawnMin = sunEvent(fullYear, month, day, true,  96.0);
+  int duskMin = sunEvent(fullYear, month, day, false, 96.0);
 
   if (riseMin >= 0) {
+    climateData.sunriseTotalMin = (int16_t)riseMin;
     climateConfig.sunriseHour   = (uint8_t)(riseMin / 60);
     climateConfig.sunriseMinute = (uint8_t)(riseMin % 60);
   }
   if (setMin >= 0) {
-    climateConfig.sunsetHour   = (uint8_t)(setMin / 60);
-    climateConfig.sunsetMinute = (uint8_t)(setMin % 60);
+    climateData.sunsetTotalMin  = (int16_t)setMin;
+    climateConfig.sunsetHour    = (uint8_t)(setMin / 60);
+    climateConfig.sunsetMinute  = (uint8_t)(setMin % 60);
   }
+  if (dawnMin >= 0) climateData.civilDawnMin = (int16_t)dawnMin;
+  if (duskMin >= 0) climateData.civilDuskMin = (int16_t)duskMin;
 
-  Serial.print("[CLIMATE] Sunrise: ");
-  Serial.print(climateConfig.sunriseHour);
-  Serial.print(":");
-  if (climateConfig.sunriseMinute < 10) Serial.print("0");
-  Serial.print(climateConfig.sunriseMinute);
-  Serial.print("  Sunset: ");
-  Serial.print(climateConfig.sunsetHour);
-  Serial.print(":");
-  if (climateConfig.sunsetMinute < 10) Serial.print("0");
-  Serial.println(climateConfig.sunsetMinute);
+  if (riseMin >= 0 && setMin >= 0)
+    climateData.dayLengthMin = (uint16_t)(setMin - riseMin);
+
+  // Effective action times (wrap into [0, 1440))
+  auto wrapMin = [](int v) -> int16_t {
+    while (v <    0) v += 1440;
+    while (v >= 1440) v -= 1440;
+    return (int16_t)v;
+  };
+
+  int baseOpen  = climateConfig.useCivilTwilight ? (int)climateData.civilDawnMin : riseMin;
+  int baseClose = climateConfig.useCivilTwilight ? (int)climateData.civilDuskMin : setMin;
+
+  climateData.doorOpenEffectiveMin  = wrapMin(baseOpen  + (int)climateConfig.doorOpenOffsetMin);
+  climateData.doorCloseEffectiveMin = wrapMin(baseClose + (int)climateConfig.doorCloseOffsetMin);
+  climateData.cameraOnEffectiveMin  = wrapMin(setMin    + (int)climateConfig.cameraOnOffsetMin);
+  climateData.cameraOffEffectiveMin = wrapMin((int)climateData.doorCloseEffectiveMin
+                                              + (int)climateConfig.cameraOffOffsetMin);
+
+  // Record last calculation date
+  climateData.lastCalcDay   = day;
+  climateData.lastCalcMonth = month;
+  climateData.lastCalcYear  = fullYear;
+
+  // Serial log
+  Serial.printf("[CLIMATE] %04u-%02u-%02u  Sunrise: %02u:%02u  Sunset: %02u:%02u"
+                "  Day: %u min  CivilDawn: %02d:%02d  CivilDusk: %02d:%02d\n",
+                fullYear, month, day,
+                climateConfig.sunriseHour, climateConfig.sunriseMinute,
+                climateConfig.sunsetHour,  climateConfig.sunsetMinute,
+                (unsigned)climateData.dayLengthMin,
+                climateData.civilDawnMin / 60, climateData.civilDawnMin % 60,
+                climateData.civilDuskMin / 60, climateData.civilDuskMin % 60);
+  Serial.printf("[CLIMATE] Door open: %02d:%02d  Door close: %02d:%02d"
+                "  Camera on: %02d:%02d  Camera off: %02d:%02d\n",
+                climateData.doorOpenEffectiveMin  / 60, climateData.doorOpenEffectiveMin  % 60,
+                climateData.doorCloseEffectiveMin / 60, climateData.doorCloseEffectiveMin % 60,
+                climateData.cameraOnEffectiveMin  / 60, climateData.cameraOnEffectiveMin  % 60,
+                climateData.cameraOffEffectiveMin / 60, climateData.cameraOffEffectiveMin % 60);
 }
 
 // ============================================================================
@@ -152,21 +226,26 @@ void climate_init() {
   climateData.isNight = false;
   climateData.lastUpdateMs = millis();
 
-  // Set default configuration (upravit zde pevné souřadnice a časové pásmo)
+  // Default configuration – adjust coordinates and timezone via web interface
   climateConfig.mode = ClimateMode::MANUAL;
   climateConfig.sunriseHour = 6;
   climateConfig.sunriseMinute = 0;
   climateConfig.sunsetHour = 20;
   climateConfig.sunsetMinute = 0;
-  climateConfig.latitude = 50.149041f;
+  climateConfig.latitude  = 50.149041f;  // Hradec Králové, CZ
   climateConfig.longitude = 15.550867f;
-  climateConfig.timezoneOffsetH = 1;
+  climateConfig.timezoneOffsetH = 1;     // CET (DST added automatically)
   climateConfig.minTempC = 10.0f;
   climateConfig.maxTempC = 28.0f;
   climateConfig.overTempC = 30.0f;
-  climateConfig.openWindowAboveTempC = 25.0f;
+  climateConfig.openWindowAboveTempC  = 25.0f;
   climateConfig.closeWindowBelowTempC = 20.0f;
   climateConfig.windowHysteresisC = 2.0f;
+  climateConfig.doorOpenOffsetMin   =  15;
+  climateConfig.doorCloseOffsetMin  =  20;
+  climateConfig.cameraOnOffsetMin   = -30;
+  climateConfig.cameraOffOffsetMin  =   0;
+  climateConfig.useCivilTwilight    = false;
 
   // Initial sun time calculation using current RTC date
   TimeData* t = rtc_getTime();
@@ -207,11 +286,8 @@ void climate_setMode(ClimateMode mode) {
 // ============================================================================
 
 static bool windowShouldBeOpen = false;  // Hysteresis tracking
-static uint8_t lastSunCalcDay = 0;        // Day of last sun time recalculation
 
 void climate_update() {
-  unsigned long currentTime = millis();
-
   // Update current temperature from sensors
   if (coopEnvironment.isValid) {
     climateData.currentTempC = coopEnvironment.temperatureC;
@@ -220,86 +296,88 @@ void climate_update() {
   // Get current time from RTC
   TimeData* time = rtc_getTime();
 
-  // Recalculate sunrise/sunset once per day at midnight (when day changes)
-  if (time->day != lastSunCalcDay) {
-    lastSunCalcDay = time->day;
+  // Recalculate sunrise/sunset once per day when day changes
+  if (time->day != climateData.lastCalcDay) {
     climate_recalculateSunTimes(time->year, time->month, time->day);
   }
 
-  // Determine if it's day or night (compare minutes-from-midnight)
-  uint16_t nowMin     = (uint16_t)time->hour * 60 + time->minute;
-  uint16_t sunriseMin = (uint16_t)climateConfig.sunriseHour * 60 + climateConfig.sunriseMinute;
-  uint16_t sunsetMin  = (uint16_t)climateConfig.sunsetHour  * 60 + climateConfig.sunsetMinute;
+  // Current time in minutes from midnight
+  int16_t nowMin = (int16_t)((uint16_t)time->hour * 60u + time->minute);
 
-  bool isDay = (nowMin >= sunriseMin && nowMin < sunsetMin);
+  // Day / night based on actual sunrise/sunset (not effective times)
+  bool isDay = (nowMin >= climateData.sunriseTotalMin && nowMin < climateData.sunsetTotalMin);
   climateData.isNight = !isDay;
 
-  // Handle different climate modes
+  // Door should be open window: doorOpenEffective → doorCloseEffective
+  bool doorShouldBeOpen;
+  if (climateData.doorOpenEffectiveMin <= climateData.doorCloseEffectiveMin) {
+    doorShouldBeOpen = (nowMin >= climateData.doorOpenEffectiveMin
+                     && nowMin <  climateData.doorCloseEffectiveMin);
+  } else {
+    // Wraps midnight (edge case for extreme offsets)
+    doorShouldBeOpen = (nowMin >= climateData.doorOpenEffectiveMin
+                     || nowMin <  climateData.doorCloseEffectiveMin);
+  }
+
   switch (climateConfig.mode) {
     // ========================================================================
     case ClimateMode::MANUAL: {
-      // Manual mode - no automatic control
-      // User commands via climate_doorOpen(), climate_doorClose(), etc.
+      // Manual mode – no automatic control
       break;
     }
 
     // ========================================================================
     case ClimateMode::SCHEDULE: {
-      // Scheduled mode - open/close at fixed times
-      bool shouldBeOpen = isDay;
-
-      if (shouldBeOpen && !climateData.doorOpen) {
+      // Scheduled mode: door follows sunrise/sunset with configured offsets
+      if (doorShouldBeOpen && !climateData.doorOpen) {
         climate_doorOpen();
-      } else if (!shouldBeOpen && climateData.doorOpen) {
+      } else if (!doorShouldBeOpen && climateData.doorOpen) {
         climate_doorClose();
       }
 
-      // Window control based on temperature
+      // Window: temperature-based, no hysteresis
       if (climateData.currentTempC > climateConfig.openWindowAboveTempC) {
         windowShouldBeOpen = true;
       } else if (climateData.currentTempC < climateConfig.closeWindowBelowTempC) {
         windowShouldBeOpen = false;
       }
-
       if (windowShouldBeOpen && !climateData.windowOpen) {
         climate_windowOpen();
       } else if (!windowShouldBeOpen && climateData.windowOpen) {
         climate_windowClose();
       }
-
       break;
     }
 
     // ========================================================================
     case ClimateMode::SMART: {
-      // Smart mode - temperature and weather aware
-      // Combines scheduled and temperature-based control
+      // Smart mode: door follows offset times AND temperature safety
+      bool shouldOpen = doorShouldBeOpen
+                     && climateData.currentTempC < climateConfig.overTempC;
 
-      // Door control: open during day, close at night
-      bool shouldBeOpen = isDay && climateData.currentTempC < climateConfig.overTempC;
-
-      if (shouldBeOpen && !climateData.doorOpen) {
+      if (shouldOpen && !climateData.doorOpen) {
         climate_doorOpen();
-      } else if (!shouldBeOpen && climateData.doorOpen) {
+      } else if (!shouldOpen && climateData.doorOpen) {
         climate_doorClose();
       }
 
-      // Window control with hysteresis
+      // Window: temperature-based with hysteresis
       if (climateData.currentTempC > climateConfig.openWindowAboveTempC) {
         windowShouldBeOpen = true;
-      } else if (climateData.currentTempC < (climateConfig.closeWindowBelowTempC - climateConfig.windowHysteresisC)) {
+      } else if (climateData.currentTempC
+                   < (climateConfig.closeWindowBelowTempC - climateConfig.windowHysteresisC)) {
         windowShouldBeOpen = false;
       }
-
       if (windowShouldBeOpen && !climateData.windowOpen) {
         climate_windowOpen();
       } else if (!windowShouldBeOpen && climateData.windowOpen) {
         climate_windowClose();
       }
-
       break;
     }
   }
+
+  climateData.lastUpdateMs = millis();
 }
 
 // ============================================================================

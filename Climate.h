@@ -46,6 +46,15 @@ struct ClimateConfig {
   
   // Hysteresis for window control
   float windowHysteresisC = 2.0f;     // Prevent chattering
+
+  // Time offsets relative to sunrise/sunset (minutes, can be negative)
+  int16_t doorOpenOffsetMin   =  15;  // Open door N minutes AFTER sunrise (positive = after)
+  int16_t doorCloseOffsetMin  =  20;  // Close door N minutes AFTER sunset  (positive = after)
+  int16_t cameraOnOffsetMin   = -30;  // Turn camera on N minutes before sunset (negative = before)
+  int16_t cameraOffOffsetMin  =   0;  // Turn camera off N minutes after door fully closed (0 = same time as close)
+
+  // Civil twilight option (6° below horizon instead of 0.833° standard)
+  bool useCivilTwilight = false;      // If true, use civil twilight for door scheduling
 };
 
 // ============================================================================
@@ -61,6 +70,24 @@ struct ClimateData {
   bool isNight = false;
   bool isSunrise = false;
   unsigned long lastUpdateMs = 0;
+
+  // Computed sun times (minutes from midnight, local time)
+  int16_t sunriseTotalMin = 360;    // Actual sunrise
+  int16_t sunsetTotalMin  = 1200;   // Actual sunset
+  int16_t civilDawnMin    = 330;    // Civil dawn  (6° below horizon)
+  int16_t civilDuskMin    = 1230;   // Civil dusk  (6° below horizon)
+  uint16_t dayLengthMin   = 840;    // Length of day in minutes
+
+  // Effective action times (sunrise/sunset + offsets)
+  int16_t doorOpenEffectiveMin  = 375;  // = sunriseTotalMin + doorOpenOffsetMin
+  int16_t doorCloseEffectiveMin = 1220; // = sunsetTotalMin  + doorCloseOffsetMin
+  int16_t cameraOnEffectiveMin  = 1170; // = sunsetTotalMin  + cameraOnOffsetMin
+  int16_t cameraOffEffectiveMin = 1220; // = doorCloseEffectiveMin + cameraOffOffsetMin
+
+  // Last calculation date
+  uint8_t lastCalcDay   = 0;
+  uint8_t lastCalcMonth = 0;
+  uint16_t lastCalcYear = 0;
 };
 
 // ============================================================================
