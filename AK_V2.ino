@@ -6,8 +6,16 @@
 #include "Globals.h"
 #include "Hardware.h"
 #include "Motor.h"
-#include "Sensors.h"
 #include "Settings.h"
+#include "Sensors.h"
+#include "RTC.h"
+#include "Climate.h"
+#include "Heater.h"
+#include "Light.h"
+#include "Alarm.h"
+#include "Logger.h"
+#include "OTA.h"
+#include "WebServer.h"
 #include "Ethernet.h"
 #include "WiFi.h"
 #include <cstring>
@@ -17,6 +25,7 @@
 // ============================================================================
 
 static unsigned long networkInitTimeMs = 0;
+static bool webServerActive = false;
 
 static void tryWiFiFallback() {
   if (!NETWORK_USE_WIFI_FALLBACK) {
@@ -30,6 +39,26 @@ static void tryWiFiFallback() {
   if (!wifi_isConnected() && wifi_getState() != WiFiState::CONNECTING) {
     wifi_connect(WIFI_DEBUG_SSID, WIFI_DEBUG_PASSWORD);
     Serial.println("[NET] WiFi fallback connect requested");
+  }
+}
+
+static bool networkHasConnectivity() {
+  return wifi_isConnected() || (NETWORK_USE_ETHERNET_PRIMARY && ethernet_isConnected());
+}
+
+static void updateNetworkServices() {
+  if (networkHasConnectivity()) {
+    if (!webServerActive && webserver_start()) {
+      webServerActive = true;
+      Serial.println("[NET] Web server started");
+    }
+    return;
+  }
+
+  if (webServerActive) {
+    webserver_stop();
+    webServerActive = false;
+    Serial.println("[NET] Web server stopped");
   }
 }
 
@@ -52,6 +81,10 @@ void setup() {
   globals_init();
   Serial.println("[INIT] Globals initialized");
 
+  // Initialize logging
+  logger_init();
+  Serial.println("[INIT] Logger initialized");
+
   // Initialize hardware (GPIO, PWM, etc.)
   hardware_init();
   Serial.println("[INIT] Hardware initialized");
@@ -64,7 +97,17 @@ void setup() {
   sensors_init();
   Serial.println("[INIT] Sensors initialized");
 
+  // Initialize timekeeping and automation support modules
+  rtc_init();
+  Serial.println("[INIT] RTC initialized");
+
   // Initialize networking (Ethernet primary, WiFi fallback for debugging)
+  webserver_init();
+  Serial.println("[INIT] Web server initialized");
+
+  ota_init();
+  Serial.println("[INIT] OTA initialized");
+
   wifi_init();
   if (NETWORK_USE_ETHERNET_PRIMARY) {
     ethernet_init();
@@ -86,6 +129,18 @@ void setup() {
   windowMotor.config = *settings_getWindowConfig();
   Serial.println("[INIT] Window motor initialized");
 
+  alarm_init();
+  Serial.println("[INIT] Alarm system initialized");
+
+  heater_init();
+  Serial.println("[INIT] Heater initialized");
+
+  light_init();
+  Serial.println("[INIT] Light initialized");
+
+  climate_init();
+  Serial.println("[INIT] Climate automation initialized");
+
   Serial.println("\n[INIT] System startup complete. Ready to operate.\n");
 }
 
@@ -105,6 +160,9 @@ void loop() {
   // Update sensor layer
   sensors_update();
 
+  // Update timekeeping
+  rtc_update();
+
   // Update network managers
   if (NETWORK_USE_ETHERNET_PRIMARY) {
     ethernet_update();
@@ -116,6 +174,16 @@ void loop() {
       (millis() - networkInitTimeMs) > ETHERNET_WIFI_FALLBACK_DELAY_MS) {
     tryWiFiFallback();
   }
+
+  updateNetworkServices();
+  webserver_update();
+  ota_update();
+
+  // Update automation/support modules
+  alarm_update();
+  heater_update();
+  light_update();
+  climate_update();
 
   // Core motor control - STATE MACHINE UPDATES
   motor_update(&doorMotor);
@@ -155,5 +223,28 @@ void logSystemStatus() {
   Serial.print(motor_getStateName(windowMotor.data.state));
   Serial.print(" (I=");
   Serial.print(windowMotor.data.currentMA);
-  Serial.println("mA)");
+  Serial.print("mA) | Temp: ");
+
+  if (coopEnvironment.isValid) {
+    Serial.print(coopEnvironment.temperatureC, 1);
+    Serial.print("C");
+  } else {
+    Serial.print("N/A");
+  }
+
+  Serial.print(" | Net: ");
+  if (NETWORK_USE_ETHERNET_PRIMARY && ethernet_isConnected()) {
+    Serial.print("ETH ");
+    Serial.print(ethernet_getLocalIP());
+  } else if (wifi_isConnected()) {
+    Serial.print("WIFI ");
+    Serial.print(wifi_getLocalIP());
+  } else {
+    Serial.print("OFFLINE");
+  }
+
+  Serial.print(" | Climate: ");
+  Serial.print(climate_getModeName(climate_getMode()));
+  Serial.print(" | Alarms: ");
+  Serial.println(alarm_getActiveCount());
 }
