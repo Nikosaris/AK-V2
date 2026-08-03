@@ -5,6 +5,7 @@
 #include "Light.h"
 #include "Settings.h"
 #include "Climate.h"
+#include "RTC.h"
 #include "Globals.h"
 #include <WiFi.h>
 
@@ -1008,6 +1009,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
       event.target.classList.add('active');
       
       if (pageId === 'motor-settings') loadMotorSettings();
+      if (pageId === 'automation') loadGPS();
     }
     
     function apiCall(endpoint) {
@@ -1120,7 +1122,31 @@ const char* HTML_TEMPLATE = R"rawliteral(
     function saveDoorAutomation() { alert('Automatika dveří uložena'); }
     function saveWindowAutomation() { alert('Automatika okna uložena'); }
     function saveCameraAutomation() { alert('Automatika kamery uložena'); }
-    function saveGPS() { alert('GPS parametry uloženy'); }
+    function saveGPS() {
+      const lat = parseFloat(document.getElementById('gpsLatitude').value);
+      const lon = parseFloat(document.getElementById('gpsLongitude').value);
+      const tzSel = document.getElementById('timezone').value;
+      const tz = tzSel.includes('UTC+2') ? 2 : 1;
+      if (isNaN(lat) || isNaN(lon)) { alert('Zadejte platné souřadnice'); return; }
+      fetch('/api/gps', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({latitude:lat, longitude:lon, timezone:tz})})
+        .then(r => r.json())
+        .then(() => alert('GPS parametry uloženy, časy přepočítány'))
+        .catch(e => alert('Chyba: ' + e));
+    }
+    function loadGPS() {
+      fetch('/api/gps').then(r => r.json()).then(d => {
+        document.getElementById('gpsLatitude').value  = d.latitude  || '';
+        document.getElementById('gpsLongitude').value = d.longitude || '';
+        const tzOpt = document.getElementById('timezone');
+        for (let i = 0; i < tzOpt.options.length; i++) {
+          if ((d.timezone === 2 && tzOpt.options[i].text.includes('UTC+2')) ||
+              (d.timezone === 1 && tzOpt.options[i].text.includes('UTC+1'))) {
+            tzOpt.selectedIndex = i; break;
+          }
+        }
+      }).catch(() => {});
+    }
     function saveLightingSettings() { alert('Nastavení osvětlení uloženo'); }
     function saveHeatingSettings() { alert('Nastavení topení uloženo'); }
     function saveNetworkSettings() { alert('Nastavení sítě uloženo'); }
@@ -1340,6 +1366,42 @@ void webserver_update() {
     }
   }
   // ------------------------------------------------------------------
+  // GPS SETTINGS - GET / POST
+  // ------------------------------------------------------------------
+  else if (path == "/api/gps") {
+    if (method == "GET") {
+      ClimateConfig* cc = climate_getConfig();
+      String json = "{";
+      json += "\"latitude\":"  + String(cc->latitude,  4) + ",";
+      json += "\"longitude\":" + String(cc->longitude, 4) + ",";
+      json += "\"timezone\":"  + String(cc->timezoneOffsetH);
+      json += "}";
+      sendJson(client, 200, json);
+    } else if (method == "POST") {
+      // Parse lat/lon/timezone from JSON body
+      float lat = (float)jsonGetInt(body, "latitude",  (int32_t)(climate_getConfig()->latitude  * 10000)) / 10000.0f;
+      float lon = (float)jsonGetInt(body, "longitude", (int32_t)(climate_getConfig()->longitude * 10000)) / 10000.0f;
+      // For floats we need a simple float parser
+      {
+        String search;
+        search = "\"latitude\":";
+        int idx = body.indexOf(search);
+        if (idx >= 0) lat = body.substring(idx + search.length()).toFloat();
+        search = "\"longitude\":";
+        idx = body.indexOf(search);
+        if (idx >= 0) lon = body.substring(idx + search.length()).toFloat();
+      }
+      int8_t tz = (int8_t)jsonGetInt(body, "timezone", climate_getConfig()->timezoneOffsetH);
+      settings_applyClimateGPS(lat, lon, tz);
+      // Immediately recalculate sun times with new coordinates
+      TimeData* t = rtc_getTime();
+      climate_recalculateSunTimes(t->year, t->month, t->day);
+      sendJson(client, 200, "{\"ok\":true}");
+    } else {
+      sendJson(client, 400, "{\"error\":\"method\"}");
+    }
+  }
+  // ------------------------------------------------------------------
   // GENERIC API COMMANDS (door/window control, etc.)
   // ------------------------------------------------------------------
   else if (path.startsWith("/api/")) {
@@ -1433,6 +1495,21 @@ void webserver_handleAPI(const char* endpoint, const char* method, const char* b
     jsonToMotorConfig(bodyStr, cfg);
     settings_applyWindowConfig(cfg);
     windowMotor.config = cfg;
+  }
+  else if (path == "/api/gps" && meth == "POST") {
+    float lat = climate_getConfig()->latitude;
+    float lon = climate_getConfig()->longitude;
+    String search;
+    search = "\"latitude\":";
+    int idx = bodyStr.indexOf(search);
+    if (idx >= 0) lat = bodyStr.substring(idx + search.length()).toFloat();
+    search = "\"longitude\":";
+    idx = bodyStr.indexOf(search);
+    if (idx >= 0) lon = bodyStr.substring(idx + search.length()).toFloat();
+    int8_t tz = (int8_t)jsonGetInt(bodyStr, "timezone", climate_getConfig()->timezoneOffsetH);
+    settings_applyClimateGPS(lat, lon, tz);
+    TimeData* t = rtc_getTime();
+    climate_recalculateSunTimes(t->year, t->month, t->day);
   }
   else if (path == "/api/restart") {
     ESP.restart();

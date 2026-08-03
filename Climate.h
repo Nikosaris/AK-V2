@@ -24,12 +24,17 @@ enum class ClimateMode : uint8_t {
 struct ClimateConfig {
   ClimateMode mode = ClimateMode::MANUAL;
   
-  // Sunrise/Sunset times (for SCHEDULE mode)
+  // Sunrise/Sunset times (for SCHEDULE mode) - auto-computed from GPS
   uint8_t sunriseHour = 6;
   uint8_t sunriseMinute = 0;
   uint8_t sunsetHour = 20;
   uint8_t sunsetMinute = 0;
   
+  // GPS coordinates for automatic sunrise/sunset calculation
+  float latitude = 50.0f;             // Degrees North (e.g. 50.08 for Prague)
+  float longitude = 14.42f;           // Degrees East  (e.g. 14.42 for Prague)
+  int8_t timezoneOffsetH = 1;         // UTC offset in hours (1 = CET, 2 = CEST)
+
   // Temperature thresholds
   float minTempC = 10.0f;             // Minimum comfortable temperature
   float maxTempC = 28.0f;             // Maximum comfortable temperature
@@ -123,5 +128,15 @@ ClimateData* climate_getData();
  * Get mode name
  */
 const char* climate_getModeName(ClimateMode mode);
+
+/**
+ * Recalculate sunrise and sunset times from GPS coordinates and current date.
+ * Updates climateConfig.sunriseHour/Minute and sunsetHour/Minute.
+ * Uses a simplified NOAA solar algorithm accurate to ±1 minute.
+ * @param year  - full year (e.g. 2025)
+ * @param month - month 1-12
+ * @param day   - day 1-31
+ */
+void climate_recalculateSunTimes(uint16_t year, uint8_t month, uint8_t day);
 
 #endif // CLIMATE_H

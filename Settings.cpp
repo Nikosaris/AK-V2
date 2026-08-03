@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Climate.h"
 #include <EEPROM.h>
 
 // ============================================================================
@@ -7,12 +8,13 @@
 
 const uint16_t EEPROM_SIZE = 4096;      // Total EEPROM size
 const uint16_t EEPROM_MAGIC = 0xAA55;   // Magic number to identify valid data
-const uint16_t EEPROM_VERSION = 1;      // Settings version
+const uint16_t EEPROM_VERSION = 2;      // Settings version (bumped for GPS addition)
 
 const uint16_t EEPROM_ADDR_MAGIC = 0;   // Magic number
 const uint16_t EEPROM_ADDR_VERSION = 2; // Version number
-const uint16_t EEPROM_ADDR_DOOR_CONFIG = 10;   // Door configuration
+const uint16_t EEPROM_ADDR_DOOR_CONFIG = 10;    // Door configuration
 const uint16_t EEPROM_ADDR_WINDOW_CONFIG = 100; // Window configuration
+const uint16_t EEPROM_ADDR_GPS = 200;           // GPS: latitude(float) + longitude(float) + timezone(int8_t)
 
 // ============================================================================
 // GLOBAL SETTINGS
@@ -20,6 +22,8 @@ const uint16_t EEPROM_ADDR_WINDOW_CONFIG = 100; // Window configuration
 
 static MotorConfig doorConfig;
 static MotorConfig windowConfig;
+
+// GPS config is stored in/retrieved from climateConfig directly via Climate.h
 
 // ============================================================================
 // INITIALIZATION
@@ -42,6 +46,12 @@ void settings_load() {
   if (magic == EEPROM_MAGIC && version == EEPROM_VERSION) {
     EEPROM.get(EEPROM_ADDR_DOOR_CONFIG, doorConfig);
     EEPROM.get(EEPROM_ADDR_WINDOW_CONFIG, windowConfig);
+
+    // Load GPS settings into climateConfig
+    ClimateConfig* cc = climate_getConfig();
+    EEPROM.get(EEPROM_ADDR_GPS, cc->latitude);
+    EEPROM.get(EEPROM_ADDR_GPS + sizeof(float), cc->longitude);
+    EEPROM.get(EEPROM_ADDR_GPS + 2 * sizeof(float), cc->timezoneOffsetH);
   } else {
     // Use default values and persist them
     settings_reset();
@@ -57,6 +67,12 @@ void settings_save() {
 
   EEPROM.put(EEPROM_ADDR_DOOR_CONFIG, doorConfig);
   EEPROM.put(EEPROM_ADDR_WINDOW_CONFIG, windowConfig);
+
+  // Save GPS settings from climateConfig
+  ClimateConfig* cc = climate_getConfig();
+  EEPROM.put(EEPROM_ADDR_GPS, cc->latitude);
+  EEPROM.put(EEPROM_ADDR_GPS + sizeof(float), cc->longitude);
+  EEPROM.put(EEPROM_ADDR_GPS + 2 * sizeof(float), cc->timezoneOffsetH);
 
   EEPROM.commit();
 }
@@ -110,5 +126,21 @@ void settings_applyDoorConfig(const MotorConfig& cfg) {
 
 void settings_applyWindowConfig(const MotorConfig& cfg) {
   windowConfig = cfg;
+  settings_save();
+}
+
+// ============================================================================
+// GPS HELPERS
+// ============================================================================
+
+ClimateConfig* settings_getClimateConfig() {
+  return climate_getConfig();
+}
+
+void settings_applyClimateGPS(float latitude, float longitude, int8_t timezoneOffsetH) {
+  ClimateConfig* cc = climate_getConfig();
+  cc->latitude         = latitude;
+  cc->longitude        = longitude;
+  cc->timezoneOffsetH  = timezoneOffsetH;
   settings_save();
 }

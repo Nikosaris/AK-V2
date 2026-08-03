@@ -3,6 +3,7 @@
 
 #include "Globals.h"
 #include "Motor.h"
+#include "Climate.h"
 
 // ============================================================================
 // SETTINGS MANAGEMENT
@@ -48,5 +49,15 @@ void settings_applyDoorConfig(const MotorConfig& cfg);
  * Apply and persist window motor configuration
  */
 void settings_applyWindowConfig(const MotorConfig& cfg);
+
+/**
+ * Get GPS/climate configuration
+ */
+ClimateConfig* settings_getClimateConfig();
+
+/**
+ * Apply and persist GPS coordinates and timezone
+ */
+void settings_applyClimateGPS(float latitude, float longitude, int8_t timezoneOffsetH);
 
 #endif // SETTINGS_H
