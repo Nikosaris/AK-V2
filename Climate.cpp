@@ -158,8 +158,8 @@ void climate_init() {
   climateConfig.sunriseMinute = 0;
   climateConfig.sunsetHour = 20;
   climateConfig.sunsetMinute = 0;
-  climateConfig.latitude = 50.0f;
-  climateConfig.longitude = 14.42f;
+  climateConfig.latitude = 50.149041f;
+  climateConfig.longitude = 15.550867f;
   climateConfig.timezoneOffsetH = 1;
   climateConfig.minTempC = 10.0f;
   climateConfig.maxTempC = 28.0f;
