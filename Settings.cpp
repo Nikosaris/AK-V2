@@ -142,5 +142,8 @@ void settings_applyClimateGPS(float latitude, float longitude, int8_t timezoneOf
   cc->latitude         = latitude;
   cc->longitude        = longitude;
   cc->timezoneOffsetH  = timezoneOffsetH;
+  TimeData* now = rtc_getTime();
+  uint16_t year = (now->year < 100) ? (2000 + now->year) : now->year;
+  climate_recalculateSunTimes(year, now->month, now->day);
   settings_save();
 }
