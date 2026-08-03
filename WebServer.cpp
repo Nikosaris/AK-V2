@@ -1035,6 +1035,8 @@ const char* HTML_TEMPLATE = R"rawliteral(
           const sunset  = String(data.sunset_hour  || 20).padStart(2,'0') + ':' + String(data.sunset_minute  || 0).padStart(2,'0');
           document.getElementById('sunriseDisplay').textContent = 'Východ slunce: ' + sunrise;
           document.getElementById('sunsetDisplay').textContent  = 'Západ slunce: '  + sunset;
+          const cameraOn  = String(data.camera_on_hour  || 0).padStart(2,'0') + ':' + String(data.camera_on_minute  || 0).padStart(2,'0');
+          document.getElementById('cameraTimeDisplay').textContent = 'Zapnutí kamery: ' + cameraOn + ' (západ slunce)';
         })
         .catch(e => console.error('Chyba:', e));
     }
@@ -1278,10 +1280,14 @@ void webserver_update() {
     json += "\"light\":false,";
     json += "\"system_mode\":\"RUN\",";
     json += "\"uptime\":"           + String(systemUptime)  + ",";
-    json += "\"sunrise_hour\":"     + String(climate_getConfig()->sunriseHour)   + ",";
-    json += "\"sunrise_minute\":"   + String(climate_getConfig()->sunriseMinute) + ",";
-    json += "\"sunset_hour\":"      + String(climate_getConfig()->sunsetHour)    + ",";
-    json += "\"sunset_minute\":"    + String(climate_getConfig()->sunsetMinute)  + ",";
+    json += "\"sunrise_hour\":"      + String(climate_getConfig()->sunriseHour)                   + ",";
+    json += "\"sunrise_minute\":"   + String(climate_getConfig()->sunriseMinute)                 + ",";
+    json += "\"sunset_hour\":"      + String(climate_getConfig()->sunsetHour)                    + ",";
+    json += "\"sunset_minute\":"    + String(climate_getConfig()->sunsetMinute)                  + ",";
+    json += "\"camera_on_hour\":"   + String(climate_getData()->cameraOnEffectiveMin  / 60)      + ",";
+    json += "\"camera_on_minute\":" + String(climate_getData()->cameraOnEffectiveMin  % 60)      + ",";
+    json += "\"camera_off_hour\":"  + String(climate_getData()->cameraOffEffectiveMin / 60)      + ",";
+    json += "\"camera_off_minute\":" + String(climate_getData()->cameraOffEffectiveMin % 60)     + ",";
     json += "\"ip_address\":\""     + ip + "\"";
     json += "}";
     sendJson(client, 200, json);
