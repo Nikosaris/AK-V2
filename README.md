@@ -19,12 +19,11 @@ AK-V2 is a professional-grade firmware for automated chicken coop control based 
 ```
 AK-V2/
 ├── AK_V2.ino          # Main sketch
-├── Globals.h/cpp      # Global variables and constants
+├── Globals.h/cpp      # Global variables, pin mapping and network constants
 ├── Hardware.h/cpp     # Hardware initialization and pin definitions
 ├── Motor.h/cpp        # Motor state machine and control
+├── Sensors.h/cpp      # Sensor and electrical telemetry layer
 ├── Settings.h/cpp     # Configuration management
-├── Scheduler.h/cpp    # Non-blocking task scheduling
-├── Sensors.h/cpp      # Sensor reading (temperature, humidity, current)
 ├── Climate.h/cpp      # Automation logic (sunrise, sunset, temperature)
 ├── Logger.h/cpp       # Event logging
 ├── WebServer.h/cpp    # Web interface and REST API
@@ -55,7 +54,7 @@ AK-V2/
 - GPIO13, GPIO15: Door (IN1, IN2)
 - GPIO32, GPIO33: Window (IN1, IN2)
 
-### Ethernet W5500 (SPI)
+### Ethernet W5500 (SPI, primary network)
 - GPIO18: SCLK
 - GPIO19: MISO
 - GPIO23: MOSI
@@ -77,4 +76,4 @@ STOPPED → OPENING/CLOSING → (OBSTACLE/TIMEOUT) → ERROR/RETRY
 ```
 
 ## Version
-v0.1.0 - Initial Structure
+v0.2.0 - W5500 Ethernet primary, WiFi fallback and updated pin map

@@ -39,7 +39,7 @@ constexpr uint8_t CAMERA_RELAY_PIN = 26;
 constexpr uint8_t HEATER_RELAY_PIN = 27;
 constexpr uint8_t LIGHT_RELAY_PIN = 14;
 
-// Ethernet W5500 SPI Bus
+// Ethernet W5500 SPI Bus (primary network interface)
 constexpr uint8_t ETH_SCLK_PIN = 18;
 constexpr uint8_t ETH_MISO_PIN = 19;
 constexpr uint8_t ETH_MOSI_PIN = 23;
@@ -47,6 +47,10 @@ constexpr uint8_t ETH_CS_PIN = 5;
 constexpr int8_t ETH_IRQ_PIN = -1;
 constexpr int8_t ETH_RST_PIN = -1;
 constexpr uint8_t ETH_PHY_ADDR = 1;
+
+// Dual-network configuration
+constexpr bool NETWORK_USE_ETHERNET_PRIMARY = true;
+constexpr bool NETWORK_USE_WIFI_FALLBACK = true;
 
 // Debug WiFi fallback (set SSID/PASSWORD for phone debugging)
 constexpr const char* WIFI_DEBUG_SSID = "";

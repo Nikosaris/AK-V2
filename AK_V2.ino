@@ -6,6 +6,7 @@
 #include "Globals.h"
 #include "Hardware.h"
 #include "Motor.h"
+#include "Sensors.h"
 #include "Settings.h"
 #include "Ethernet.h"
 #include "WiFi.h"
@@ -15,11 +16,13 @@
 // MOTOR INSTANCES
 // ============================================================================
 
-static Motor doorMotor;
-static Motor windowMotor;
 static unsigned long networkInitTimeMs = 0;
 
 static void tryWiFiFallback() {
+  if (!NETWORK_USE_WIFI_FALLBACK) {
+    return;
+  }
+
   if (strlen(WIFI_DEBUG_SSID) == 0) {
     return;
   }
@@ -42,7 +45,7 @@ void setup() {
   Serial.println("\n\n=================================================================================");
   Serial.println("AK-V2: Professional Chicken Coop Automation Firmware");
   Serial.println("Platform: ESP32-WROOM-32");
-  Serial.println("Version: 0.1.0");
+  Serial.println("Version: 0.2.0");
   Serial.println("=================================================================================");
 
   // Initialize globals
@@ -57,11 +60,17 @@ void setup() {
   settings_init();
   Serial.println("[INIT] Settings loaded");
 
+  // Initialize sensor layer
+  sensors_init();
+  Serial.println("[INIT] Sensors initialized");
+
   // Initialize networking (Ethernet primary, WiFi fallback for debugging)
   wifi_init();
-  ethernet_init();
+  if (NETWORK_USE_ETHERNET_PRIMARY) {
+    ethernet_init();
+  }
   networkInitTimeMs = millis();
-  if (ethernet_connect()) {
+  if (NETWORK_USE_ETHERNET_PRIMARY && ethernet_connect()) {
     Serial.println("[NET] Ethernet W5500 initialization started (primary)");
   } else {
     Serial.println("[NET] Ethernet init failed, trying WiFi fallback");
@@ -69,11 +78,11 @@ void setup() {
   }
 
   // Initialize motor structures
-  motor_init(&doorMotor, "Door", PWM_CHANNEL_DOOR_IN1, PWM_CHANNEL_DOOR_IN2);
+  motor_init(&doorMotor, "Door", DOOR_IN1_PIN, DOOR_IN2_PIN);
   doorMotor.config = *settings_getDoorConfig();
   Serial.println("[INIT] Door motor initialized");
 
-  motor_init(&windowMotor, "Window", PWM_CHANNEL_WINDOW_IN1, PWM_CHANNEL_WINDOW_IN2);
+  motor_init(&windowMotor, "Window", WINDOW_IN1_PIN, WINDOW_IN2_PIN);
   windowMotor.config = *settings_getWindowConfig();
   Serial.println("[INIT] Window motor initialized");
 
@@ -93,12 +102,18 @@ void loop() {
   // Update hardware state
   hardware_update();
 
+  // Update sensor layer
+  sensors_update();
+
   // Update network managers
-  ethernet_update();
+  if (NETWORK_USE_ETHERNET_PRIMARY) {
+    ethernet_update();
+  }
   wifi_update();
 
   // Ethernet is primary; if unavailable for some time, allow WiFi fallback
-  if (!ethernet_isConnected() && (millis() - networkInitTimeMs) > ETHERNET_WIFI_FALLBACK_DELAY_MS) {
+  if ((!NETWORK_USE_ETHERNET_PRIMARY || !ethernet_isConnected()) &&
+      (millis() - networkInitTimeMs) > ETHERNET_WIFI_FALLBACK_DELAY_MS) {
     tryWiFiFallback();
   }
 
