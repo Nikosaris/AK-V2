@@ -1397,3 +1397,44 @@ const char* webserver_getStateName(WebServerState state) {
     default:                      return "UNKNOWN";
   }
 }
+
+// ============================================================================
+// API HANDLER - called externally with pre-parsed endpoint/method/body
+// ============================================================================
+
+void webserver_handleAPI(const char* endpoint, const char* method, const char* body) {
+  if (!endpoint || !method) return;
+
+  String path(endpoint);
+  String meth(method);
+  String bodyStr(body ? body : "");
+
+  if (path == "/api/door/open")         motor_setCommand(&doorMotor,   MotorCommand::OPEN);
+  else if (path == "/api/door/close")   motor_setCommand(&doorMotor,   MotorCommand::CLOSE);
+  else if (path == "/api/door/stop")    motor_setCommand(&doorMotor,   MotorCommand::STOP);
+  else if (path == "/api/door/reset")   motor_resetError(&doorMotor);
+  else if (path == "/api/window/open")  motor_setCommand(&windowMotor, MotorCommand::OPEN);
+  else if (path == "/api/window/close") motor_setCommand(&windowMotor, MotorCommand::CLOSE);
+  else if (path == "/api/window/stop")  motor_setCommand(&windowMotor, MotorCommand::STOP);
+  else if (path == "/api/window/reset") motor_resetError(&windowMotor);
+  else if (path == "/api/heater/on")    heater_setMode(HeaterState::ON);
+  else if (path == "/api/heater/off")   heater_setMode(HeaterState::OFF);
+  else if (path == "/api/heater/auto")  heater_setMode(HeaterState::AUTO);
+  else if (path == "/api/light/auto")   light_setMode(LightState::AUTO);
+  else if (path == "/api/light/off")    light_setMode(LightState::OFF);
+  else if (path == "/api/door/settings" && meth == "POST") {
+    MotorConfig cfg = *settings_getDoorConfig();
+    jsonToMotorConfig(bodyStr, cfg);
+    settings_applyDoorConfig(cfg);
+    doorMotor.config = cfg;
+  }
+  else if (path == "/api/window/settings" && meth == "POST") {
+    MotorConfig cfg = *settings_getWindowConfig();
+    jsonToMotorConfig(bodyStr, cfg);
+    settings_applyWindowConfig(cfg);
+    windowMotor.config = cfg;
+  }
+  else if (path == "/api/restart") {
+    ESP.restart();
+  }
+}
