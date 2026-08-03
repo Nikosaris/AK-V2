@@ -37,8 +37,8 @@ AK-V2/
 ### Digital Inputs
 - GPIO16: DOOR_TOP_LIMIT
 - GPIO17: DOOR_BOTTOM_LIMIT
-- GPIO19: WINDOW_TOP_LIMIT
-- GPIO23: WINDOW_BOTTOM_LIMIT
+- GPIO36: WINDOW_TOP_LIMIT
+- GPIO39: WINDOW_BOTTOM_LIMIT
 - GPIO25: LOCAL_BUTTON
 
 ### Analog Inputs
@@ -52,8 +52,15 @@ AK-V2/
 - GPIO4: DS18B20 (Temperature Sensors)
 
 ### H-Bridge Outputs (Motors)
-- GPIO5, GPIO18: Door (IN1, IN2)
+- GPIO13, GPIO15: Door (IN1, IN2)
 - GPIO32, GPIO33: Window (IN1, IN2)
+
+### Ethernet W5500 (SPI)
+- GPIO18: SCLK
+- GPIO19: MISO
+- GPIO23: MOSI
+- GPIO5: CS
+- Ethernet is primary link, WiFi is fallback/debug
 
 ### Relay Outputs
 - GPIO26: Camera Relay

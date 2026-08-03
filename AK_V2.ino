@@ -7,6 +7,9 @@
 #include "Hardware.h"
 #include "Motor.h"
 #include "Settings.h"
+#include "Ethernet.h"
+#include "WiFi.h"
+#include <cstring>
 
 // ============================================================================
 // MOTOR INSTANCES
@@ -14,6 +17,18 @@
 
 static Motor doorMotor;
 static Motor windowMotor;
+static unsigned long networkInitTimeMs = 0;
+
+static void tryWiFiFallback() {
+  if (strlen(WIFI_DEBUG_SSID) == 0) {
+    return;
+  }
+
+  if (!wifi_isConnected() && wifi_getState() != WiFiState::CONNECTING) {
+    wifi_connect(WIFI_DEBUG_SSID, WIFI_DEBUG_PASSWORD);
+    Serial.println("[NET] WiFi fallback connect requested");
+  }
+}
 
 // ============================================================================
 // SETUP - Initialization
@@ -42,6 +57,17 @@ void setup() {
   settings_init();
   Serial.println("[INIT] Settings loaded");
 
+  // Initialize networking (Ethernet primary, WiFi fallback for debugging)
+  wifi_init();
+  ethernet_init();
+  networkInitTimeMs = millis();
+  if (ethernet_connect()) {
+    Serial.println("[NET] Ethernet W5500 initialization started (primary)");
+  } else {
+    Serial.println("[NET] Ethernet init failed, trying WiFi fallback");
+    tryWiFiFallback();
+  }
+
   // Initialize motor structures
   motor_init(&doorMotor, "Door", PWM_CHANNEL_DOOR_IN1, PWM_CHANNEL_DOOR_IN2);
   doorMotor.config = *settings_getDoorConfig();
@@ -66,6 +92,15 @@ void loop() {
 
   // Update hardware state
   hardware_update();
+
+  // Update network managers
+  ethernet_update();
+  wifi_update();
+
+  // Ethernet is primary; if unavailable for some time, allow WiFi fallback
+  if (!ethernet_isConnected() && (millis() - networkInitTimeMs) > ETHERNET_WIFI_FALLBACK_DELAY_MS) {
+    tryWiFiFallback();
+  }
 
   // Core motor control - STATE MACHINE UPDATES
   motor_update(&doorMotor);
