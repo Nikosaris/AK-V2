@@ -62,6 +62,7 @@ void setup() {
 
   WiFi.mode(WIFI_AP);
   WiFi.softAP(AP_SSID, AP_PASSWORD);
+  delay(500);  // Wait for AP to assign IP before starting server
 
   server.on("/", []() { server.send(200, "text/html", HTML); });
   server.on("/api/status", []() { server.send(200, "application/json", statusJson()); });
