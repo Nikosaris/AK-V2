@@ -719,11 +719,13 @@ const char* HTML_TEMPLATE = R"rawliteral(
               <label>Zeměpisná Délka</label>
               <input type="number" id="gpsLongitude" placeholder="14.0" step="0.0001">
             </div>
-            <div class="form-group">
-              <label>Časové Pásmo</label>
+              <div class="form-group">
+              <label>Časové Pásmo (zimní čas, letní čas se přidá automaticky)</label>
               <select id="timezone">
-                <option>UTC+1 (CET)</option>
-                <option>UTC+2 (CEST)</option>
+                <option value="0">UTC+0 (GMT/WET)</option>
+                <option value="1" selected>UTC+1 (CET)</option>
+                <option value="2">UTC+2 (EET)</option>
+                <option value="3">UTC+3</option>
               </select>
             </div>
             <button class="primary" onclick="saveGPS()">Uložit</button>
@@ -1125,8 +1127,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
     function saveGPS() {
       const lat = parseFloat(document.getElementById('gpsLatitude').value);
       const lon = parseFloat(document.getElementById('gpsLongitude').value);
-      const tzSel = document.getElementById('timezone').value;
-      const tz = tzSel.includes('UTC+2') ? 2 : 1;
+      const tz  = parseInt(document.getElementById('timezone').value, 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Zadejte platné souřadnice'); return; }
       fetch('/api/gps', {method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({latitude:lat, longitude:lon, timezone:tz})})
@@ -1140,8 +1141,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
         document.getElementById('gpsLongitude').value = d.longitude || '';
         const tzOpt = document.getElementById('timezone');
         for (let i = 0; i < tzOpt.options.length; i++) {
-          if ((d.timezone === 2 && tzOpt.options[i].text.includes('UTC+2')) ||
-              (d.timezone === 1 && tzOpt.options[i].text.includes('UTC+1'))) {
+          if (parseInt(tzOpt.options[i].value, 10) === d.timezone) {
             tzOpt.selectedIndex = i; break;
           }
         }

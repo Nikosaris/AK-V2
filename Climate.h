@@ -33,7 +33,7 @@ struct ClimateConfig {
   // GPS coordinates for automatic sunrise/sunset calculation
   float latitude = 50.0f;             // Degrees North (e.g. 50.08 for Prague)
   float longitude = 14.42f;           // Degrees East  (e.g. 14.42 for Prague)
-  int8_t timezoneOffsetH = 1;         // UTC offset in hours (1 = CET, 2 = CEST)
+  int8_t timezoneOffsetH = 1;         // Base UTC offset WITHOUT DST (1 = CET). DST (+1 h) is added automatically.
 
   // Temperature thresholds
   float minTempC = 10.0f;             // Minimum comfortable temperature

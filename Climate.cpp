@@ -19,63 +19,93 @@ extern Motor windowMotor;
 // Accurate to ±1-2 minutes for mid-latitudes.
 // Returns time in minutes from midnight (local time).
 // Returns -1 if sun never rises/sets (polar day/night).
+//
+// NOTE: All intermediate JD arithmetic is done in double to avoid float32
+// precision loss. A 32-bit float has only ~7 significant digits; JD values
+// near 2,451,545 lose the fractional part to rounding steps of 0.25
+// (= 6 h), producing errors of ±90 minutes. Using double fixes this.
 // ============================================================================
 
-static const float DEG2RAD = M_PI / 180.0f;
-static const float RAD2DEG = 180.0f / M_PI;
+static const double DEG2RAD_D = M_PI / 180.0;
 
-// Compute Julian Day Number from calendar date (Gregorian calendar)
-static float climate_julianDay(uint16_t year, uint8_t month, uint8_t day) {
+// Return 1 if EU summer time (DST) is in effect on the given date, else 0.
+// EU rule: DST starts last Sunday of March at 01:00 UTC,
+//          ends   last Sunday of October at 01:00 UTC.
+static int climate_isDST_EU(uint16_t year, uint8_t month, uint8_t day) {
+  if (month < 3 || month > 10) return 0;
+  if (month > 3 && month < 10) return 1;
+
+  // Find day-of-week of the 31st (or 30th for April/Sept) of the month.
+  // Zeller's formula for day-of-week (0=Sun … 6=Sat):
+  uint8_t checkDay = 31; // both March and October have 31 days
+  // Tomohiko Sakamoto's algorithm
+  static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+  uint16_t y = year - (checkDay < 3 ? 1 : 0);
+  uint8_t dow31 = (y + y/4 - y/100 + y/400 + t[checkDay-1] + checkDay) % 7;
+  // Last Sunday of month = 31 - ((dow31 == 0) ? 0 : dow31)
+  // But for March dow of day 31; last Sunday = 31 - dow31 (if dow31>0) else 31
+  uint8_t lastSun = (uint8_t)(31 - dow31);
+
+  if (month == 3)  return (day >= lastSun) ? 1 : 0;
+  else             return (day <  lastSun) ? 1 : 0;
+}
+
+// Compute Julian Day Number from calendar date (Gregorian calendar).
+// Returns a double to preserve the fractional part needed for time calculation.
+static double climate_julianDay(uint16_t year, uint8_t month, uint8_t day) {
   if (month <= 2) {
     year -= 1;
     month += 12;
   }
   int A = (int)(year / 100);
   int B = 2 - A + (int)(A / 4);
-  return (int)(365.25f * (year + 4716)) + (int)(30.6001f * (month + 1)) + day + B - 1524.5f;
+  return (long)(365.25 * (year + 4716)) + (int)(30.6001 * (month + 1)) + day + B - 1524.5;
 }
 
 // Calculate sunrise or sunset in minutes from midnight (local time).
 // isSunrise = true → sunrise, false → sunset.
 // Returns -1 on failure (polar).
 static int climate_sunEvent(uint16_t year, uint8_t month, uint8_t day, bool isSunrise) {
-  float lat = climateConfig.latitude;
-  float lon = climateConfig.longitude;
-  int8_t tz  = climateConfig.timezoneOffsetH;
+  double lat = (double)climateConfig.latitude;
+  double lon = (double)climateConfig.longitude;
+  // Apply DST on top of the base UTC offset stored in config
+  int tz = (int)climateConfig.timezoneOffsetH + climate_isDST_EU(year, month, day);
 
-  float jd = climate_julianDay(year, month, day);
-  float n  = jd - 2451545.0f + 0.0008f;
+  // All JD arithmetic in double to avoid float32 precision loss (~0.25 JD steps)
+  double jd = climate_julianDay(year, month, day);
+  // Work relative to J2000 epoch to keep numbers small
+  double n  = jd - 2451545.0 + 0.0008;
 
-  float Js = n - lon / 360.0f;
-  float M  = fmodf(357.5291f + 0.98560028f * Js, 360.0f);
-  float C  = 1.9148f * sinf(M * DEG2RAD)
-           + 0.0200f * sinf(2.0f * M * DEG2RAD)
-           + 0.0003f * sinf(3.0f * M * DEG2RAD);
-  float lambda = fmodf(M + C + 180.0f + 102.9372f, 360.0f);
+  double Js     = n - lon / 360.0;
+  double M      = fmod(357.5291 + 0.98560028 * Js, 360.0);
+  double C      = 1.9148 * sin(M * DEG2RAD_D)
+                + 0.0200 * sin(2.0 * M * DEG2RAD_D)
+                + 0.0003 * sin(3.0 * M * DEG2RAD_D);
+  double lambda = fmod(M + C + 180.0 + 102.9372, 360.0);
 
-  float Jt   = 2451545.0f + Js + 0.0053f * sinf(M * DEG2RAD) - 0.0069f * sinf(2.0f * lambda * DEG2RAD);
-  float sinD = sinf(lambda * DEG2RAD) * sinf(23.4397f * DEG2RAD);
-  float cosD = cosf(asinf(sinD));
+  double Jt    = 2451545.0 + Js + 0.0053 * sin(M * DEG2RAD_D) - 0.0069 * sin(2.0 * lambda * DEG2RAD_D);
+  double sinD  = sin(lambda * DEG2RAD_D) * sin(23.4397 * DEG2RAD_D);
+  double cosD  = cos(asin(sinD));
 
-  float cosH = (sinf(-0.8333f * DEG2RAD) - sinf(lat * DEG2RAD) * sinD)
-               / (cosf(lat * DEG2RAD) * cosD);
+  double cosH  = (sin(-0.8333 * DEG2RAD_D) - sin(lat * DEG2RAD_D) * sinD)
+                 / (cos(lat * DEG2RAD_D) * cosD);
 
-  if (cosH < -1.0f || cosH > 1.0f) {
+  if (cosH < -1.0 || cosH > 1.0) {
     return -1; // polar day or night
   }
 
-  float H = acosf(cosH) * RAD2DEG;
-  float Jrise = Jt - H / 360.0f;
-  float Jset  = Jt + H / 360.0f;
+  double H      = acos(cosH) * (180.0 / M_PI);
+  double Jevent = isSunrise ? (Jt - H / 360.0) : (Jt + H / 360.0);
 
-  float Jevent = isSunrise ? Jrise : Jset;
-  // Convert Julian day fraction to minutes from midnight UTC
-  float fractDay = Jevent - (int)Jevent;
-  int minutesUTC = (int)roundf(fractDay * 1440.0f) % 1440;
+  // Extract fractional day relative to J2000 epoch (keeps value small → no precision loss)
+  double fracFromEpoch = Jevent - 2451545.0;
+  // Convert to minutes-from-midnight UTC: only the sub-day fraction matters
+  double dayFrac = fracFromEpoch - floor(fracFromEpoch);
+  int minutesUTC = (int)round(dayFrac * 1440.0) % 1440;
   if (minutesUTC < 0) minutesUTC += 1440;
 
   int minutesLocal = minutesUTC + tz * 60;
-  if (minutesLocal < 0) minutesLocal += 1440;
+  if (minutesLocal < 0)    minutesLocal += 1440;
   if (minutesLocal >= 1440) minutesLocal -= 1440;
 
   return minutesLocal;
