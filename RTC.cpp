@@ -1,31 +1,60 @@
 #include "RTC.h"
-#include <Wire.h>
+#include <time.h>
 
 // ============================================================================
-// RTC DATA AND CONSTANTS
+// NTP CONFIGURATION
+// ============================================================================
+
+static const char* NTP_SERVER_1  = "pool.ntp.org";
+static const char* NTP_SERVER_2  = "time.nist.gov";
+static const long  GMT_OFFSET_SEC  = 3600;   // UTC+1 (CET); change to 7200 for CEST
+static const int   DAYLIGHT_OFFSET_SEC = 3600;
+
+// ============================================================================
+// RTC DATA
 // ============================================================================
 
 static TimeData currentTime;
 static bool rtcValid = false;
-const uint8_t DS3231_ADDRESS = 0x68;
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+static uint8_t dayOfWeekFromTm(int wday) {
+  // struct tm: 0=Sunday … 6=Saturday — same as TimeData convention
+  return (uint8_t)wday;
+}
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 void rtc_init() {
-  // RTC initialization would require DS3231 or similar module
-  // For now, initialize with default values
-  currentTime.year = 0;
-  currentTime.month = 1;
-  currentTime.day = 1;
-  currentTime.hour = 0;
-  currentTime.minute = 0;
-  currentTime.second = 0;
+  currentTime.year      = 0;
+  currentTime.month     = 1;
+  currentTime.day       = 1;
+  currentTime.hour      = 0;
+  currentTime.minute    = 0;
+  currentTime.second    = 0;
   currentTime.dayOfWeek = 0;
   rtcValid = false;
 
-  // TODO: Implement DS3231 I2C communication when hardware available
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2);
+}
+
+void rtc_syncNTP() {
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    currentTime.year      = (uint8_t)(timeinfo.tm_year - 100); // years since 1900 → offset from 2000
+    currentTime.month     = (uint8_t)(timeinfo.tm_mon + 1);    // 0-based → 1-based
+    currentTime.day       = (uint8_t)timeinfo.tm_mday;
+    currentTime.hour      = (uint8_t)timeinfo.tm_hour;
+    currentTime.minute    = (uint8_t)timeinfo.tm_min;
+    currentTime.second    = (uint8_t)timeinfo.tm_sec;
+    currentTime.dayOfWeek = dayOfWeekFromTm(timeinfo.tm_wday);
+    rtcValid = true;
+  }
 }
 
 // ============================================================================
@@ -33,31 +62,16 @@ void rtc_init() {
 // ============================================================================
 
 void rtc_update() {
-  // TODO: Read from DS3231 RTC module via I2C
-  // For now, update based on millis() since boot
-  static unsigned long lastUpdateMs = 0;
-  unsigned long now = millis();
-
-  if (now - lastUpdateMs >= 1000) {
-    lastUpdateMs = now;
-    currentTime.second++;
-
-    // Handle rollover
-    if (currentTime.second >= 60) {
-      currentTime.second = 0;
-      currentTime.minute++;
-
-      if (currentTime.minute >= 60) {
-        currentTime.minute = 0;
-        currentTime.hour++;
-
-        if (currentTime.hour >= 24) {
-          currentTime.hour = 0;
-          currentTime.day++;
-          // TODO: Handle month/year rollover
-        }
-      }
-    }
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    currentTime.year      = (uint8_t)(timeinfo.tm_year - 100);
+    currentTime.month     = (uint8_t)(timeinfo.tm_mon + 1);
+    currentTime.day       = (uint8_t)timeinfo.tm_mday;
+    currentTime.hour      = (uint8_t)timeinfo.tm_hour;
+    currentTime.minute    = (uint8_t)timeinfo.tm_min;
+    currentTime.second    = (uint8_t)timeinfo.tm_sec;
+    currentTime.dayOfWeek = dayOfWeekFromTm(timeinfo.tm_wday);
+    rtcValid = true;
   }
 }
 
@@ -73,18 +87,13 @@ bool rtc_setTime(TimeData* time) {
   if (time == nullptr) {
     return false;
   }
-
   currentTime = *time;
   rtcValid = true;
-
-  // TODO: Write to DS3231 module
   return true;
 }
 
 unsigned long rtc_getUnixTime() {
-  // Simplified: return seconds since boot
-  // Real implementation would calculate from TimeData
-  return millis() / 1000;
+  return (unsigned long)::time(nullptr);
 }
 
 bool rtc_isValid() {
@@ -92,7 +101,7 @@ bool rtc_isValid() {
 }
 
 const char* rtc_getDayName(uint8_t dayOfWeek) {
-  const char* days[] = {"Sunday", "Monday", "Tuesday", "Wednesday", 
+  const char* days[] = {"Sunday", "Monday", "Tuesday", "Wednesday",
                         "Thursday", "Friday", "Saturday"};
   if (dayOfWeek > 6) {
     return "Unknown";
@@ -101,7 +110,7 @@ const char* rtc_getDayName(uint8_t dayOfWeek) {
 }
 
 const char* rtc_getMonthName(uint8_t month) {
-  const char* months[] = {"Invalid", "January", "February", "March", 
+  const char* months[] = {"Invalid", "January", "February", "March",
                           "April", "May", "June", "July", "August",
                           "September", "October", "November", "December"};
   if (month > 12) {
