@@ -3,6 +3,7 @@
 #include "Sensors.h"
 #include "Heater.h"
 #include "Light.h"
+#include "Settings.h"
 #include "Globals.h"
 #include <WiFi.h>
 
@@ -1004,6 +1005,8 @@ const char* HTML_TEMPLATE = R"rawliteral(
       
       document.getElementById(pageId).classList.add('active');
       event.target.classList.add('active');
+      
+      if (pageId === 'motor-settings') loadMotorSettings();
     }
     
     function apiCall(endpoint) {
@@ -1026,7 +1029,11 @@ const char* HTML_TEMPLATE = R"rawliteral(
         .then(r => r.json())
         .then(data => {
           document.getElementById('doorStatus').textContent = data.door_status || '--';
+          document.getElementById('doorCurrent').textContent = (data.door_current || 0) + ' mA';
+          document.getElementById('doorRetries').textContent = data.door_retries || 0;
           document.getElementById('windowStatus').textContent = data.window_status || '--';
+          document.getElementById('windowCurrent').textContent = (data.window_current || 0) + ' mA';
+          document.getElementById('windowRetries').textContent = data.window_retries || 0;
           document.getElementById('cameraStatus').innerHTML = '<span class="status-badge ' + (data.camera ? 'status-on' : 'status-off') + '">' + (data.camera ? 'ZAPNUTO' : 'VYPNUTO') + '</span>';
           document.getElementById('coopTemp').textContent = (data.coop_temp || 0).toFixed(1) + ' °C';
           document.getElementById('cabinetTemp').textContent = (data.cabinet_temp || 0).toFixed(1) + ' °C';
@@ -1041,12 +1048,70 @@ const char* HTML_TEMPLATE = R"rawliteral(
           document.getElementById('sensorCabinetTemp').textContent = (data.cabinet_temp || 0).toFixed(1) + ' °C';
           document.getElementById('sensorCabinetHumidity').textContent = (data.cabinet_humidity || 0).toFixed(0) + ' %';
           document.getElementById('sensorDewPoint').textContent = (data.dew_point || 0).toFixed(1) + ' °C';
+          document.getElementById('sensorDoorCurrent').textContent = (data.door_current || 0) + ' mA';
+          document.getElementById('sensorWindowCurrent').textContent = (data.window_current || 0) + ' mA';
         })
         .catch(e => console.error('Chyba:', e));
     }
     
-    function saveDoorSettings() { alert('Nastavení dveří uloženo'); }
-    function saveWindowSettings() { alert('Nastavení okna uloženo'); }
+    function saveDoorSettings() {
+      const cfg = {
+        timeoutMs:              parseInt(document.getElementById('doorTimeout').value)             || 30000,
+        maxCurrent:             parseInt(document.getElementById('doorMaxCurrent').value)          || 2000,
+        currentIgnoreTimeMs:    parseInt(document.getElementById('doorCurrentIgnoreTime').value)   || 500,
+        overCurrentTimeMs:      parseInt(document.getElementById('doorOvercurrentConfirmTime').value) || 1000,
+        maxRetries:             parseInt(document.getElementById('doorRetries').value)             || 3,
+        pwmOpen:                parseInt(document.getElementById('doorPwmOpen').value)             || 200,
+        pwmClose:               parseInt(document.getElementById('doorPwmClose').value)            || 200,
+        pwmSlow:                parseInt(document.getElementById('doorPwmSlow').value)             || 100,
+        slowApproachDistanceMs: parseInt(document.getElementById('doorSlowdownTime').value)        || 2000
+      };
+      fetch('/api/door/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cfg)})
+        .then(r => r.json())
+        .then(() => alert('Nastavení dveří uloženo'))
+        .catch(e => alert('Chyba: ' + e));
+    }
+    function saveWindowSettings() {
+      const cfg = {
+        timeoutMs:              parseInt(document.getElementById('windowTimeout').value)             || 20000,
+        maxCurrent:             parseInt(document.getElementById('windowMaxCurrent').value)          || 1500,
+        currentIgnoreTimeMs:    parseInt(document.getElementById('windowCurrentIgnoreTime').value)   || 500,
+        overCurrentTimeMs:      parseInt(document.getElementById('windowOvercurrentConfirmTime').value) || 800,
+        maxRetries:             parseInt(document.getElementById('windowRetries').value)             || 3,
+        pwmOpen:                parseInt(document.getElementById('windowPwmOpen').value)             || 180,
+        pwmClose:               parseInt(document.getElementById('windowPwmClose').value)            || 180,
+        pwmSlow:                parseInt(document.getElementById('windowPwmSlow').value)             || 90,
+        slowApproachDistanceMs: parseInt(document.getElementById('windowSlowdownTime').value)        || 1500
+      };
+      fetch('/api/window/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cfg)})
+        .then(r => r.json())
+        .then(() => alert('Nastavení okna (ventilace) uloženo'))
+        .catch(e => alert('Chyba: ' + e));
+    }
+    function loadMotorSettings() {
+      fetch('/api/door/settings').then(r => r.json()).then(d => {
+        document.getElementById('doorTimeout').value                = d.timeoutMs             || '';
+        document.getElementById('doorMaxCurrent').value             = d.maxCurrent            || '';
+        document.getElementById('doorCurrentIgnoreTime').value      = d.currentIgnoreTimeMs   || '';
+        document.getElementById('doorOvercurrentConfirmTime').value = d.overCurrentTimeMs     || '';
+        document.getElementById('doorRetries').value                = d.maxRetries            || '';
+        document.getElementById('doorPwmOpen').value                = d.pwmOpen               || '';
+        document.getElementById('doorPwmClose').value               = d.pwmClose              || '';
+        document.getElementById('doorPwmSlow').value                = d.pwmSlow               || '';
+        document.getElementById('doorSlowdownTime').value           = d.slowApproachDistanceMs|| '';
+      }).catch(() => {});
+      fetch('/api/window/settings').then(r => r.json()).then(d => {
+        document.getElementById('windowTimeout').value                = d.timeoutMs             || '';
+        document.getElementById('windowMaxCurrent').value             = d.maxCurrent            || '';
+        document.getElementById('windowCurrentIgnoreTime').value      = d.currentIgnoreTimeMs   || '';
+        document.getElementById('windowOvercurrentConfirmTime').value = d.overCurrentTimeMs     || '';
+        document.getElementById('windowRetries').value                = d.maxRetries            || '';
+        document.getElementById('windowPwmOpen').value                = d.pwmOpen               || '';
+        document.getElementById('windowPwmClose').value               = d.pwmClose              || '';
+        document.getElementById('windowPwmSlow').value                = d.pwmSlow               || '';
+        document.getElementById('windowSlowdownTime').value           = d.slowApproachDistanceMs|| '';
+      }).catch(() => {});
+    }
     function saveDoorAutomation() { alert('Automatika dveří uložena'); }
     function saveWindowAutomation() { alert('Automatika okna uložena'); }
     function saveCameraAutomation() { alert('Automatika kamery uložena'); }
@@ -1072,6 +1137,73 @@ const char* HTML_TEMPLATE = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
+// ============================================================================
+// HELPER: Extract integer value from simple flat JSON string
+// e.g. jsonGetInt("{\"timeoutMs\":30000}", "timeoutMs") -> 30000
+// Returns defaultVal if key not found.
+// ============================================================================
+
+static int32_t jsonGetInt(const String& json, const char* key, int32_t defaultVal = 0) {
+  String search = "\"";
+  search += key;
+  search += "\":";
+  int idx = json.indexOf(search);
+  if (idx < 0) return defaultVal;
+  idx += search.length();
+  // skip optional whitespace
+  while (idx < (int)json.length() && json[idx] == ' ') idx++;
+  return json.substring(idx).toInt();
+}
+
+// ============================================================================
+// HELPER: Build motor config JSON
+// ============================================================================
+
+static String motorConfigToJson(const MotorConfig& cfg) {
+  String json = "{";
+  json += "\"timeoutMs\":"               + String(cfg.timeoutMs)             + ",";
+  json += "\"maxCurrent\":"              + String(cfg.maxCurrent)             + ",";
+  json += "\"currentIgnoreTimeMs\":"     + String(cfg.currentIgnoreTimeMs)    + ",";
+  json += "\"overCurrentTimeMs\":"       + String(cfg.overCurrentTimeMs)      + ",";
+  json += "\"maxRetries\":"              + String(cfg.maxRetries)             + ",";
+  json += "\"pwmOpen\":"                 + String(cfg.pwmOpen)                + ",";
+  json += "\"pwmClose\":"                + String(cfg.pwmClose)               + ",";
+  json += "\"pwmSlow\":"                 + String(cfg.pwmSlow)                + ",";
+  json += "\"slowApproachDistanceMs\":"  + String(cfg.slowApproachDistanceMs);
+  json += "}";
+  return json;
+}
+
+// ============================================================================
+// HELPER: Parse motor config from JSON body and fill cfg
+// ============================================================================
+
+static void jsonToMotorConfig(const String& json, MotorConfig& cfg) {
+  cfg.timeoutMs             = (uint32_t)jsonGetInt(json, "timeoutMs",             cfg.timeoutMs);
+  cfg.maxCurrent            = (uint16_t)jsonGetInt(json, "maxCurrent",            cfg.maxCurrent);
+  cfg.currentIgnoreTimeMs   = (uint32_t)jsonGetInt(json, "currentIgnoreTimeMs",   cfg.currentIgnoreTimeMs);
+  cfg.overCurrentTimeMs     = (uint32_t)jsonGetInt(json, "overCurrentTimeMs",     cfg.overCurrentTimeMs);
+  cfg.maxRetries            = (uint8_t) jsonGetInt(json, "maxRetries",            cfg.maxRetries);
+  cfg.pwmOpen               = (uint8_t) jsonGetInt(json, "pwmOpen",               cfg.pwmOpen);
+  cfg.pwmClose              = (uint8_t) jsonGetInt(json, "pwmClose",              cfg.pwmClose);
+  cfg.pwmSlow               = (uint8_t) jsonGetInt(json, "pwmSlow",               cfg.pwmSlow);
+  cfg.slowApproachDistanceMs= (uint32_t)jsonGetInt(json, "slowApproachDistanceMs",cfg.slowApproachDistanceMs);
+}
+
+// ============================================================================
+// HELPER: Send JSON response
+// ============================================================================
+
+static void sendJson(WiFiClient& client, int code, const String& json) {
+  String status = (code == 200) ? "200 OK" : (code == 400 ? "400 Bad Request" : "404 Not Found");
+  client.println("HTTP/1.1 " + status);
+  client.println("Content-Type: application/json");
+  client.println("Content-Length: " + String(json.length()));
+  client.println("Connection: close");
+  client.println();
+  client.print(json);
+}
 
 // ============================================================================
 // WEB SERVER UPDATE - HANDLE CLIENT REQUESTS
@@ -1103,9 +1235,24 @@ void webserver_update() {
   String method = request.substring(0, request.indexOf(' '));
   String path = request.substring(request.indexOf(' ') + 1, request.lastIndexOf(' '));
 
+  // Read headers – capture Content-Length for POST body
+  int contentLength = 0;
   while (client.available()) {
     String line = client.readStringUntil('\n');
-    if (line == "\r") break;
+    line.trim();
+    if (line.length() == 0) break;
+    if (line.startsWith("Content-Length:")) {
+      contentLength = line.substring(15).toInt();
+    }
+  }
+
+  // Read POST body if present
+  String body = "";
+  if (method == "POST" && contentLength > 0) {
+    unsigned long bodyTimeout = millis() + 500;
+    while ((int)body.length() < contentLength && millis() < bodyTimeout) {
+      if (client.available()) body += (char)client.read();
+    }
   }
 
   // ========================================================================
@@ -1120,36 +1267,83 @@ void webserver_update() {
     client.println();
     client.print(HTML_TEMPLATE);
   }
+  // ------------------------------------------------------------------
+  // STATUS - real data
+  // ------------------------------------------------------------------
   else if (path == "/api/status") {
+    EnvironmentData* coop    = sensors_getCoopEnvironment();
+    EnvironmentData* cabinet = sensors_getCabinetEnvironment();
+    ElectricalData*  elec    = sensors_getElectricalData();
+
+    String ip = "";
+    if (WiFi.status() == WL_CONNECTED) ip = WiFi.localIP().toString();
+
     String json = "{";
-    json += "\"door_status\":\"ZAVŘENO\",";
-    json += "\"window_status\":\"ZAVŘENO\",";
+    json += "\"door_status\":\""    + String(motor_getStateName(doorMotor.data.state))   + "\",";
+    json += "\"door_current\":"     + String(doorMotor.data.currentMA)                   + ",";
+    json += "\"door_retries\":"     + String(doorMotor.data.retryCount)                  + ",";
+    json += "\"window_status\":\"" + String(motor_getStateName(windowMotor.data.state))  + "\",";
+    json += "\"window_current\":"   + String(windowMotor.data.currentMA)                 + ",";
+    json += "\"window_retries\":"   + String(windowMotor.data.retryCount)                + ",";
     json += "\"camera\":false,";
-    json += "\"coop_temp\":22.5,";
-    json += "\"cabinet_temp\":18.3,";
-    json += "\"cabinet_humidity\":65,";
-    json += "\"dew_point\":11.2,";
+    json += "\"coop_temp\":"        + String(coop->isValid    ? coop->temperatureC    : 0.0f, 1) + ",";
+    json += "\"cabinet_temp\":"     + String(cabinet->isValid ? cabinet->temperatureC : 0.0f, 1) + ",";
+    json += "\"cabinet_humidity\":" + String(cabinet->isValid ? cabinet->humidityPercent : 0.0f, 0) + ",";
+    json += "\"dew_point\":"        + String(cabinet->isValid ? cabinet->dewPointC    : 0.0f, 1) + ",";
     json += "\"heater\":false,";
     json += "\"light\":false,";
     json += "\"system_mode\":\"RUN\",";
-    json += "\"uptime\":141000,";
-    json += "\"ip_address\":\"172.20.10.6\"";
+    json += "\"uptime\":"           + String(systemUptime)  + ",";
+    json += "\"ip_address\":\""     + ip + "\"";
     json += "}";
-
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: " + String(json.length()));
-    client.println("Connection: close");
-    client.println();
-    client.print(json);
+    sendJson(client, 200, json);
   }
+  // ------------------------------------------------------------------
+  // DOOR SETTINGS - GET (return current config) / POST (apply new config)
+  // ------------------------------------------------------------------
+  else if (path == "/api/door/settings") {
+    if (method == "GET") {
+      sendJson(client, 200, motorConfigToJson(*settings_getDoorConfig()));
+    } else if (method == "POST") {
+      MotorConfig cfg = *settings_getDoorConfig();
+      jsonToMotorConfig(body, cfg);
+      settings_applyDoorConfig(cfg);
+      doorMotor.config = cfg;
+      sendJson(client, 200, "{\"ok\":true}");
+    } else {
+      sendJson(client, 400, "{\"error\":\"method\"}");
+    }
+  }
+  // ------------------------------------------------------------------
+  // WINDOW SETTINGS - GET / POST
+  // ------------------------------------------------------------------
+  else if (path == "/api/window/settings") {
+    if (method == "GET") {
+      sendJson(client, 200, motorConfigToJson(*settings_getWindowConfig()));
+    } else if (method == "POST") {
+      MotorConfig cfg = *settings_getWindowConfig();
+      jsonToMotorConfig(body, cfg);
+      settings_applyWindowConfig(cfg);
+      windowMotor.config = cfg;
+      sendJson(client, 200, "{\"ok\":true}");
+    } else {
+      sendJson(client, 400, "{\"error\":\"method\"}");
+    }
+  }
+  // ------------------------------------------------------------------
+  // GENERIC API COMMANDS (door/window control, etc.)
+  // ------------------------------------------------------------------
   else if (path.startsWith("/api/")) {
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: application/json");
-    client.println("Content-Length: 16");
-    client.println("Connection: close");
-    client.println();
-    client.print("{\"status\":\"ok\"}");
+    if (path == "/api/door/open")    motor_setCommand(&doorMotor,   MotorCommand::OPEN);
+    else if (path == "/api/door/close")  motor_setCommand(&doorMotor,   MotorCommand::CLOSE);
+    else if (path == "/api/door/stop")   motor_setCommand(&doorMotor,   MotorCommand::STOP);
+    else if (path == "/api/door/reset")  motor_resetError(&doorMotor);
+    else if (path == "/api/window/open") motor_setCommand(&windowMotor, MotorCommand::OPEN);
+    else if (path == "/api/window/close")motor_setCommand(&windowMotor, MotorCommand::CLOSE);
+    else if (path == "/api/window/stop") motor_setCommand(&windowMotor, MotorCommand::STOP);
+    else if (path == "/api/window/reset")motor_resetError(&windowMotor);
+    else if (path == "/api/restart")     ESP.restart();
+    sendJson(client, 200, "{\"ok\":true}");
   }
   else {
     client.println("HTTP/1.1 404 Not Found");

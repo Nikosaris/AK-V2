@@ -40,11 +40,10 @@ void settings_load() {
   uint16_t version = EEPROM.read(EEPROM_ADDR_VERSION) | (EEPROM.read(EEPROM_ADDR_VERSION + 1) << 8);
 
   if (magic == EEPROM_MAGIC && version == EEPROM_VERSION) {
-    // Load from EEPROM
-    // For now, using default values
-    // TODO: Implement EEPROM reading
+    EEPROM.get(EEPROM_ADDR_DOOR_CONFIG, doorConfig);
+    EEPROM.get(EEPROM_ADDR_WINDOW_CONFIG, windowConfig);
   } else {
-    // Use default values
+    // Use default values and persist them
     settings_reset();
   }
 }
@@ -56,15 +55,16 @@ void settings_save() {
   EEPROM.write(EEPROM_ADDR_VERSION, EEPROM_VERSION & 0xFF);
   EEPROM.write(EEPROM_ADDR_VERSION + 1, (EEPROM_VERSION >> 8) & 0xFF);
 
-  // TODO: Save motor configurations
+  EEPROM.put(EEPROM_ADDR_DOOR_CONFIG, doorConfig);
+  EEPROM.put(EEPROM_ADDR_WINDOW_CONFIG, windowConfig);
 
   EEPROM.commit();
 }
 
 void settings_reset() {
-  // Door configuration defaults
+  // Door configuration defaults (heavier motor, higher current, longer timeout)
   doorConfig.timeoutMs = 30000;
-  doorConfig.maxCurrent = 1500;
+  doorConfig.maxCurrent = 2000;
   doorConfig.currentIgnoreTimeMs = 500;
   doorConfig.overCurrentTimeMs = 1000;
   doorConfig.maxRetries = 3;
@@ -73,8 +73,16 @@ void settings_reset() {
   doorConfig.pwmSlow = 100;
   doorConfig.slowApproachDistanceMs = 2000;
 
-  // Window configuration defaults (same as door for now)
-  windowConfig = doorConfig;
+  // Window (ventilation) configuration defaults (lighter motor, lower current, shorter timeout)
+  windowConfig.timeoutMs = 20000;
+  windowConfig.maxCurrent = 1500;
+  windowConfig.currentIgnoreTimeMs = 500;
+  windowConfig.overCurrentTimeMs = 800;
+  windowConfig.maxRetries = 3;
+  windowConfig.pwmOpen = 180;
+  windowConfig.pwmClose = 180;
+  windowConfig.pwmSlow = 90;
+  windowConfig.slowApproachDistanceMs = 1500;
 
   settings_save();
 }
@@ -89,4 +97,18 @@ MotorConfig* settings_getDoorConfig() {
 
 MotorConfig* settings_getWindowConfig() {
   return &windowConfig;
+}
+
+// ============================================================================
+// APPLY HELPERS - update config and persist immediately
+// ============================================================================
+
+void settings_applyDoorConfig(const MotorConfig& cfg) {
+  doorConfig = cfg;
+  settings_save();
+}
+
+void settings_applyWindowConfig(const MotorConfig& cfg) {
+  windowConfig = cfg;
+  settings_save();
 }
