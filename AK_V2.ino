@@ -20,9 +20,9 @@
 #include "WiFi.h"
 #include <cstring>
 
-// Compatibility declarations for Arduino builds where local headers differ
-extern Motor doorMotor;
-extern Motor windowMotor;
+// Compatibility fallback for builds where Motor.cpp is not linked by the IDE
+Motor doorMotor __attribute__((weak));
+Motor windowMotor __attribute__((weak));
 
 void wifi_init();
 void wifi_update();
