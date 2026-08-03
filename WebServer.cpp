@@ -1132,7 +1132,11 @@ const char* HTML_TEMPLATE = R"rawliteral(
       fetch('/api/gps', {method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({latitude:lat, longitude:lon, timezone:tz})})
         .then(r => r.json())
-        .then(() => alert('GPS parametry uloženy, časy přepočítány'))
+        .then(() => {
+          loadGPS();
+          updateStatus();
+          alert('GPS parametry uloženy, časy přepočítány');
+        })
         .catch(e => alert('Chyba: ' + e));
     }
     function loadGPS() {
