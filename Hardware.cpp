@@ -1,1 +1,74 @@
-#include "Hardware.h"\n\n// ============================================================================\n// HARDWARE INITIALIZATION\n// ============================================================================\n\nvoid hardware_init() {\n  // Initialize digital inputs (limit switches, button)\n  pinMode(DOOR_TOP_LIMIT_PIN, INPUT);\n  pinMode(DOOR_BOTTOM_LIMIT_PIN, INPUT);\n  pinMode(WINDOW_TOP_LIMIT_PIN, INPUT);\n  pinMode(WINDOW_BOTTOM_LIMIT_PIN, INPUT);\n  pinMode(LOCAL_BUTTON_PIN, INPUT);\n\n  // Initialize motor control pins (H-Bridge)\n  pinMode(DOOR_IN1_PIN, OUTPUT);\n  pinMode(DOOR_IN2_PIN, OUTPUT);\n  pinMode(WINDOW_IN1_PIN, OUTPUT);\n  pinMode(WINDOW_IN2_PIN, OUTPUT);\n\n  // Initialize relay outputs\n  pinMode(CAMERA_RELAY_PIN, OUTPUT);\n  pinMode(HEATER_RELAY_PIN, OUTPUT);\n  pinMode(LIGHT_RELAY_PIN, OUTPUT);\n\n  // Initialize analog input for current sensing\n  pinMode(ACS712_PIN, INPUT);\n\n  // Ensure all motor outputs are stopped\n  digitalWrite(DOOR_IN1_PIN, LOW);\n  digitalWrite(DOOR_IN2_PIN, LOW);\n  digitalWrite(WINDOW_IN1_PIN, LOW);\n  digitalWrite(WINDOW_IN2_PIN, LOW);\n\n  // Ensure all relays are off\n  digitalWrite(CAMERA_RELAY_PIN, LOW);\n  digitalWrite(HEATER_RELAY_PIN, LOW);\n  digitalWrite(LIGHT_RELAY_PIN, LOW);\n\n  // Configure PWM for motor control using ESP32 LEDC API\n  // Door motor PWM\n  ledcAttach(DOOR_IN1_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);\n  ledcAttach(DOOR_IN2_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);\n\n  // Window motor PWM\n  ledcAttach(WINDOW_IN1_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);\n  ledcAttach(WINDOW_IN2_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);\n}\n\n// ============================================================================\n// HARDWARE UPDATE\n// ============================================================================\n\nvoid hardware_update() {\n  // This function can be used for periodic hardware maintenance\n  // Currently empty, but available for future expansion\n}\n\n// ============================================================================\n// HARDWARE SHUTDOWN\n// ============================================================================\n\nvoid hardware_shutdown() {\n  // Stop all motors\n  digitalWrite(DOOR_IN1_PIN, LOW);\n  digitalWrite(DOOR_IN2_PIN, LOW);\n  digitalWrite(WINDOW_IN1_PIN, LOW);\n  digitalWrite(WINDOW_IN2_PIN, LOW);\n\n  // Turn off all relays\n  digitalWrite(CAMERA_RELAY_PIN, LOW);\n  digitalWrite(HEATER_RELAY_PIN, LOW);\n  digitalWrite(LIGHT_RELAY_PIN, LOW);\n}\n
+#include "Hardware.h"
+
+// ============================================================================
+// HARDWARE INITIALIZATION
+// ============================================================================
+
+void hardware_init() {
+  // Initialize digital inputs (limit switches, button)
+  pinMode(DOOR_TOP_LIMIT_PIN, INPUT);
+  pinMode(DOOR_BOTTOM_LIMIT_PIN, INPUT);
+  pinMode(WINDOW_TOP_LIMIT_PIN, INPUT);
+  pinMode(WINDOW_BOTTOM_LIMIT_PIN, INPUT);
+  pinMode(LOCAL_BUTTON_PIN, INPUT);
+
+  // Initialize motor control pins (H-Bridge)
+  pinMode(DOOR_IN1_PIN, OUTPUT);
+  pinMode(DOOR_IN2_PIN, OUTPUT);
+  pinMode(WINDOW_IN1_PIN, OUTPUT);
+  pinMode(WINDOW_IN2_PIN, OUTPUT);
+
+  // Initialize relay outputs
+  pinMode(CAMERA_RELAY_PIN, OUTPUT);
+  pinMode(HEATER_RELAY_PIN, OUTPUT);
+  pinMode(LIGHT_RELAY_PIN, OUTPUT);
+
+  // Initialize analog input for current sensing
+  pinMode(ACS712_PIN, INPUT);
+
+  // Ensure all motor outputs are stopped
+  digitalWrite(DOOR_IN1_PIN, LOW);
+  digitalWrite(DOOR_IN2_PIN, LOW);
+  digitalWrite(WINDOW_IN1_PIN, LOW);
+  digitalWrite(WINDOW_IN2_PIN, LOW);
+
+  // Ensure all relays are off
+  digitalWrite(CAMERA_RELAY_PIN, LOW);
+  digitalWrite(HEATER_RELAY_PIN, LOW);
+  digitalWrite(LIGHT_RELAY_PIN, LOW);
+
+  // Configure PWM for motor control using ESP32 LEDC API
+  // Door motor PWM
+  ledcAttach(DOOR_IN1_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);
+  ledcAttach(DOOR_IN2_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);
+
+  // Window motor PWM
+  ledcAttach(WINDOW_IN1_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);
+  ledcAttach(WINDOW_IN2_PIN, PWM_FREQUENCY * 1000, PWM_RESOLUTION);
+}
+
+// ============================================================================
+// HARDWARE UPDATE
+// ============================================================================
+
+void hardware_update() {
+  // This function can be used for periodic hardware maintenance
+  // Currently empty, but available for future expansion
+}
+
+// ============================================================================
+// HARDWARE SHUTDOWN
+// ============================================================================
+
+void hardware_shutdown() {
+  // Stop all motors
+  digitalWrite(DOOR_IN1_PIN, LOW);
+  digitalWrite(DOOR_IN2_PIN, LOW);
+  digitalWrite(WINDOW_IN1_PIN, LOW);
+  digitalWrite(WINDOW_IN2_PIN, LOW);
+
+  // Turn off all relays
+  digitalWrite(CAMERA_RELAY_PIN, LOW);
+  digitalWrite(HEATER_RELAY_PIN, LOW);
+  digitalWrite(LIGHT_RELAY_PIN, LOW);
+}
