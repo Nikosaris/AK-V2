@@ -30,25 +30,11 @@ bool wifi_connect(const char* ssid, const char* password);
 bool wifi_isConnected();
 const char* wifi_getLocalIP();
 
-#ifndef NETWORK_USE_ETHERNET_PRIMARY
-constexpr bool NETWORK_USE_ETHERNET_PRIMARY = true;
-#endif
-
-#ifndef NETWORK_USE_WIFI_FALLBACK
-constexpr bool NETWORK_USE_WIFI_FALLBACK = true;
-#endif
-
-#ifndef WIFI_DEBUG_SSID
-constexpr const char* WIFI_DEBUG_SSID = "";
-#endif
-
-#ifndef WIFI_DEBUG_PASSWORD
-constexpr const char* WIFI_DEBUG_PASSWORD = "";
-#endif
-
-#ifndef ETHERNET_WIFI_FALLBACK_DELAY_MS
-constexpr uint32_t ETHERNET_WIFI_FALLBACK_DELAY_MS = 10000;
-#endif
+static constexpr bool AKV2_USE_ETHERNET_PRIMARY = true;
+static constexpr bool AKV2_USE_WIFI_FALLBACK = true;
+static constexpr const char* AKV2_WIFI_DEBUG_SSID = "";
+static constexpr const char* AKV2_WIFI_DEBUG_PASSWORD = "";
+static constexpr uint32_t AKV2_ETHERNET_WIFI_FALLBACK_DELAY_MS = 10000;
 
 // ============================================================================
 // MOTOR INSTANCES
@@ -58,22 +44,22 @@ static unsigned long networkInitTimeMs = 0;
 static bool webServerActive = false;
 
 static void tryWiFiFallback() {
-  if (!NETWORK_USE_WIFI_FALLBACK) {
+  if (!AKV2_USE_WIFI_FALLBACK) {
     return;
   }
 
-  if (strlen(WIFI_DEBUG_SSID) == 0) {
+  if (strlen(AKV2_WIFI_DEBUG_SSID) == 0) {
     return;
   }
 
   if (!wifi_isConnected()) {
-    wifi_connect(WIFI_DEBUG_SSID, WIFI_DEBUG_PASSWORD);
+    wifi_connect(AKV2_WIFI_DEBUG_SSID, AKV2_WIFI_DEBUG_PASSWORD);
     Serial.println("[NET] WiFi fallback connect requested");
   }
 }
 
 static bool networkHasConnectivity() {
-  return wifi_isConnected() || (NETWORK_USE_ETHERNET_PRIMARY && ethernet_isConnected());
+  return wifi_isConnected() || (AKV2_USE_ETHERNET_PRIMARY && ethernet_isConnected());
 }
 
 static void updateNetworkServices() {
@@ -139,11 +125,11 @@ void setup() {
   Serial.println("[INIT] OTA initialized");
 
   wifi_init();
-  if (NETWORK_USE_ETHERNET_PRIMARY) {
+  if (AKV2_USE_ETHERNET_PRIMARY) {
     ethernet_init();
   }
   networkInitTimeMs = millis();
-  if (NETWORK_USE_ETHERNET_PRIMARY && ethernet_connect()) {
+  if (AKV2_USE_ETHERNET_PRIMARY && ethernet_connect()) {
     Serial.println("[NET] Ethernet W5500 initialization started (primary)");
   } else {
     Serial.println("[NET] Ethernet init failed, trying WiFi fallback");
@@ -194,14 +180,14 @@ void loop() {
   rtc_update();
 
   // Update network managers
-  if (NETWORK_USE_ETHERNET_PRIMARY) {
+  if (AKV2_USE_ETHERNET_PRIMARY) {
     ethernet_update();
   }
   wifi_update();
 
   // Ethernet is primary; if unavailable for some time, allow WiFi fallback
-  if ((!NETWORK_USE_ETHERNET_PRIMARY || !ethernet_isConnected()) &&
-      (millis() - networkInitTimeMs) > ETHERNET_WIFI_FALLBACK_DELAY_MS) {
+  if ((!AKV2_USE_ETHERNET_PRIMARY || !ethernet_isConnected()) &&
+      (millis() - networkInitTimeMs) > AKV2_ETHERNET_WIFI_FALLBACK_DELAY_MS) {
     tryWiFiFallback();
   }
 
@@ -263,7 +249,7 @@ void logSystemStatus() {
   }
 
   Serial.print(" | Net: ");
-  if (NETWORK_USE_ETHERNET_PRIMARY && ethernet_isConnected()) {
+  if (AKV2_USE_ETHERNET_PRIMARY && ethernet_isConnected()) {
     Serial.print("ETH ");
     Serial.print(ethernet_getLocalIP());
   } else if (wifi_isConnected()) {
