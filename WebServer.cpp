@@ -4,6 +4,7 @@
 #include "Heater.h"
 #include "Light.h"
 #include "Settings.h"
+#include "Climate.h"
 #include "Globals.h"
 #include <WiFi.h>
 
@@ -1050,6 +1051,10 @@ const char* HTML_TEMPLATE = R"rawliteral(
           document.getElementById('sensorDewPoint').textContent = (data.dew_point || 0).toFixed(1) + ' °C';
           document.getElementById('sensorDoorCurrent').textContent = (data.door_current || 0) + ' mA';
           document.getElementById('sensorWindowCurrent').textContent = (data.window_current || 0) + ' mA';
+          const sunrise = String(data.sunrise_hour || 6).padStart(2,'0') + ':' + String(data.sunrise_minute || 0).padStart(2,'0');
+          const sunset  = String(data.sunset_hour  || 20).padStart(2,'0') + ':' + String(data.sunset_minute  || 0).padStart(2,'0');
+          document.getElementById('sunriseDisplay').textContent = 'Východ slunce: ' + sunrise;
+          document.getElementById('sunsetDisplay').textContent  = 'Západ slunce: '  + sunset;
         })
         .catch(e => console.error('Chyba:', e));
     }
@@ -1294,6 +1299,10 @@ void webserver_update() {
     json += "\"light\":false,";
     json += "\"system_mode\":\"RUN\",";
     json += "\"uptime\":"           + String(systemUptime)  + ",";
+    json += "\"sunrise_hour\":"     + String(climate_getConfig()->sunriseHour)   + ",";
+    json += "\"sunrise_minute\":"   + String(climate_getConfig()->sunriseMinute) + ",";
+    json += "\"sunset_hour\":"      + String(climate_getConfig()->sunsetHour)    + ",";
+    json += "\"sunset_minute\":"    + String(climate_getConfig()->sunsetMinute)  + ",";
     json += "\"ip_address\":\""     + ip + "\"";
     json += "}";
     sendJson(client, 200, json);
