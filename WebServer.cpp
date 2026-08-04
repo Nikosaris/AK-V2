@@ -1057,6 +1057,7 @@ const char* HTML_TEMPLATE = R"rawliteral(
           const sunset  = String(data.sunset_hour  || 20).padStart(2,'0') + ':' + String(data.sunset_minute  || 0).padStart(2,'0');
           document.getElementById('sunriseDisplay').textContent = 'Východ slunce: ' + sunrise;
           document.getElementById('sunsetDisplay').textContent  = 'Západ slunce: '  + sunset;
+          document.getElementById('cameraTimeDisplay').textContent = 'Zapnutí kamery: ' + sunset + ' (západ slunce)';
         })
         .catch(e => console.error('Chyba:', e));
     }
