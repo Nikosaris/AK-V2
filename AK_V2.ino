@@ -23,8 +23,8 @@
 // MOTOR INSTANCES
 // ============================================================================
 
-static Motor doorMotor;
-static Motor windowMotor;
+Motor doorMotor;
+Motor windowMotor;
 
 // ============================================================================
 // SETUP
