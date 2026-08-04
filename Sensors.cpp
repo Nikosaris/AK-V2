@@ -12,8 +12,6 @@ EnvironmentData  cabinetEnvironment;
 ElectricalData   electricalData;
 
 OneWireTemperature externalTemperature;
-OneWireTemperature cabinetTemperature;
-OneWireTemperature heaterTemperature;
 CurrentMeasurement currentSensors;
 
 // ============================================================================
@@ -22,16 +20,23 @@ CurrentMeasurement currentSensors;
 
 static OneWire oneWire(ONEWIRE_PIN);
 static DallasTemperature ds18b20(&oneWire);
+static unsigned long lastSensorReadMs = 0;
 
 // ============================================================================
 // INTERNÍ FUNKCE
 // ============================================================================
 
 static uint16_t sensors_readCurrentMA() {
-  const int32_t millivolts = static_cast<int32_t>(analogRead(ACS712_PIN)) * 3300 / 4095;
-  const int32_t deltaMV = millivolts - 2500;
-  const int32_t currentMA = abs(deltaMV) * 1000 / 185;
-  return (currentMA > 5000) ? 0 : static_cast<uint16_t>(currentMA);
+  int32_t adcSum = 0;
+  for (uint8_t sample = 0; sample < ACS712_AVERAGE_SAMPLES; ++sample) {
+    adcSum += analogRead(ACS712_PIN);
+  }
+
+  const int32_t averageAdc = adcSum / ACS712_AVERAGE_SAMPLES;
+  const int32_t millivolts = averageAdc * 3300 / 4095;
+  const int32_t deltaMV = millivolts - ACS712_ZERO_OFFSET_MV;
+  const int32_t currentMA = abs(deltaMV) * 1000 / ACS712_SENSITIVITY_MV_PER_A;
+  return (currentMA > ACS712_MAX_VALID_CURRENT_MA) ? 0 : static_cast<uint16_t>(currentMA);
 }
 
 // ============================================================================
@@ -41,14 +46,14 @@ static uint16_t sensors_readCurrentMA() {
 void sensors_init() {
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   ds18b20.begin();
+  ds18b20.setWaitForConversion(false);
 
   coopEnvironment = {};
   cabinetEnvironment = {};
   electricalData = {};
   externalTemperature = {};
-  cabinetTemperature = {};
-  heaterTemperature = {};
   currentSensors = {};
+  lastSensorReadMs = 0;
 }
 
 // ============================================================================
@@ -57,8 +62,11 @@ void sensors_init() {
 
 void sensors_update() {
   const unsigned long now = millis();
+  if ((now - lastSensorReadMs) < SENSOR_READ_INTERVAL_MS) {
+    return;
+  }
+  lastSensorReadMs = now;
 
-  sensors_readSHT30(SHT30_ADDR_COOP, &coopEnvironment);
   sensors_readSHT30(SHT30_ADDR_CABINET, &cabinetEnvironment);
 
   if (cabinetEnvironment.isValid) {
@@ -68,9 +76,17 @@ void sensors_update() {
     );
   }
 
-  sensors_readDS18B20(0, &externalTemperature);
-  sensors_readDS18B20(1, &cabinetTemperature);
-  sensors_readDS18B20(2, &heaterTemperature);
+  ds18b20.requestTemperatures();
+  sensors_readDS18B20(&externalTemperature);
+
+  if (externalTemperature.isValid) {
+    coopEnvironment.temperatureC = externalTemperature.temperatureC;
+    coopEnvironment.isValid = true;
+    coopEnvironment.lastReadMs = externalTemperature.lastReadMs;
+    coopEnvironment.lastUpdateMs = externalTemperature.lastReadMs;
+  } else {
+    coopEnvironment.isValid = false;
+  }
 
   const uint16_t currentMA = sensors_readCurrentMA();
   currentSensors.currentMA = currentMA;
@@ -125,11 +141,10 @@ bool sensors_readSHT30(uint8_t address, EnvironmentData* data) {
 // ČTENÍ DS18B20 (OneWire)
 // ============================================================================
 
-bool sensors_readDS18B20(uint8_t index, OneWireTemperature* temp) {
+bool sensors_readDS18B20(OneWireTemperature* temp) {
   if (temp == nullptr) return false;
 
-  ds18b20.requestTemperatures();
-  float t = ds18b20.getTempCByIndex(index);
+  float t = ds18b20.getTempCByIndex(0);
 
   if (t == DEVICE_DISCONNECTED_C || t < -55.0f || t > 125.0f) {
     temp->isValid = false;
