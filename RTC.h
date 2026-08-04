@@ -19,58 +19,55 @@ struct TimeData {
 };
 
 // ============================================================================
-// RTC FUNCTIONS
+// RTC SOURCE ENUM
 // ============================================================================
 
-/**
- * Initialize RTC module
- * NOTE: Requires DS3231 or similar RTC on I2C bus
- */
+enum class RTCSource : uint8_t {
+  NONE         = 0,
+  MILLIS       = 1,
+  EEPROM       = 2,
+  DS3231       = 3,
+  NTP_WIFI     = 4,
+  NTP_ETHERNET = 5
+};
+
+// ============================================================================
+// RTC FUNCTIONS - Basic
+// ============================================================================
+
 void rtc_init();
-
-/**
- * Update RTC and internal timing
- * Should be called periodically
- */
 void rtc_update();
-
-/**
- * Get current time
- * @return - pointer to TimeData structure
- */
 TimeData* rtc_getTime();
-
-/**
- * Set time on RTC module
- * @param time - TimeData to set
- * @return - true if successful
- */
 bool rtc_setTime(TimeData* time);
-
-/**
- * Get current Unix timestamp
- * @return - seconds since 2000-01-01 00:00:00
- */
 unsigned long rtc_getUnixTime();
-
-/**
- * Check if RTC has valid time
- * @return - true if RTC has been set and is running
- */
 bool rtc_isValid();
-
-/**
- * Get day name
- * @param dayOfWeek - 0-6 (0=Sunday)
- * @return - day name string
- */
 const char* rtc_getDayName(uint8_t dayOfWeek);
-
-/**
- * Get month name
- * @param month - 1-12
- * @return - month name string
- */
 const char* rtc_getMonthName(uint8_t month);
+
+// ============================================================================
+// RTC FUNCTIONS - DS3231 Hardware
+// ============================================================================
+
+bool rtc_initDS3231();
+bool rtc_readDS3231();
+bool rtc_writeDS3231(TimeData* time);
+bool rtc_isDS3231Available();
+
+// ============================================================================
+// RTC FUNCTIONS - EEPROM Backup
+// ============================================================================
+
+void rtc_saveToEEPROM();
+void rtc_loadFromEEPROM();
+bool rtc_hasValidEEPROM();
+
+// ============================================================================
+// RTC FUNCTIONS - Source management
+// ============================================================================
+
+RTCSource rtc_getCurrentSource();
+const char* rtc_getSourceName(RTCSource source);
+void rtc_adjustTime(int32_t offsetSeconds);
+void rtc_syncFromNTP(TimeData* ntpTime, bool viaEthernet);
 
 #endif // RTC_H

@@ -1,5 +1,7 @@
-#include "WiFi.h"
+#include "WifiManager.h"
+#include "RTC.h"
 #include <WiFi.h>
+#include <time.h>
 
 // ============================================================================
 // WiFi INSTANCE - GLOBAL DATA
@@ -185,4 +187,59 @@ const char* wifi_getStateName(WiFiState state) {
     case WiFiState::ERROR:        return "ERROR";
     default:                      return "UNKNOWN";
   }
+}
+
+// ============================================================================
+// NTP SYNC VIA WiFi
+// ============================================================================
+
+bool wifi_ntpSync() {
+  if (!wifiData.isConnected) {
+    Serial.println("[WiFi] NTP sync skipped - not connected");
+    return false;
+  }
+
+  Serial.println("[WiFi] === NTP Synchronizace pres WiFi ===");
+
+  // Czech Republic: UTC+1 (winter) / UTC+2 (summer), automatic DST
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+  tzset();
+
+  Serial.print("[WiFi] Cekam na NTP odpoved...");
+  struct tm timeinfo;
+  unsigned long startMs = millis();
+  bool got = false;
+
+  while (millis() - startMs < 10000) {
+    if (getLocalTime(&timeinfo)) {
+      got = true;
+      break;
+    }
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (!got) {
+    Serial.println("[WiFi] NTP sync selhal - timeout");
+    return false;
+  }
+
+  TimeData t;
+  t.year      = (uint8_t)(timeinfo.tm_year + 1900 - 2000);  // years since 2000
+  t.month     = (uint8_t)(timeinfo.tm_mon + 1);
+  t.day       = (uint8_t)(timeinfo.tm_mday);
+  t.hour      = (uint8_t)(timeinfo.tm_hour);
+  t.minute    = (uint8_t)(timeinfo.tm_min);
+  t.second    = (uint8_t)(timeinfo.tm_sec);
+  t.dayOfWeek = (uint8_t)(timeinfo.tm_wday);  // 0=Sunday
+
+  char buf[48];
+  snprintf(buf, sizeof(buf), "[WiFi] NTP cas: 20%02d-%02d-%02d %02d:%02d:%02d",
+           t.year, t.month, t.day, t.hour, t.minute, t.second);
+  Serial.println(buf);
+
+  rtc_syncFromNTP(&t, false);  // false = via WiFi (not Ethernet)
+  return true;
 }

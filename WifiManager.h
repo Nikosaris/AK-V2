@@ -1,5 +1,5 @@
-#ifndef WIFI_H
-#define WIFI_H
+#ifndef WIFIMANAGER_H
+#define WIFIMANAGER_H
 
 #include <Arduino.h>
 #include "Globals.h"
@@ -111,4 +111,11 @@ const char* wifi_getLocalIP();
  */
 const char* wifi_getStateName(WiFiState state);
 
-#endif // WIFI_H
+/**
+ * Synchronize time via NTP over WiFi
+ * Fills provided TimeData struct and calls rtc_syncFromNTP()
+ * @return true if sync succeeded
+ */
+bool wifi_ntpSync();
+
+#endif // WIFIMANAGER_H
