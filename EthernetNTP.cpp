@@ -128,7 +128,7 @@ void ethernet_init() {
   ethConfig.mac[5] = 0x01;
 
   // Data defaults
-  ethData.state          = EthernetState::INITIALIZING;
+  ethData.state          = EthernetState::ETH_INITIALIZING;
   ethData.isConnected    = false;
   ethData.ntpSynced      = false;
   ethData.lastNTPSyncMs  = 0;
@@ -162,24 +162,24 @@ bool ethernet_connect() {
     // Check hardware
     if (Ethernet.hardwareStatus() == EthernetNoHardware) {
       Serial.println("[ETH] W5500 not found");
-      ethData.state       = EthernetState::ERROR;
+      ethData.state       = EthernetState::ETH_ERROR;
       ethData.isConnected = false;
       return false;
     }
     if (Ethernet.linkStatus() == LinkOFF) {
       Serial.println("[ETH] Ethernet cable not connected");
-      ethData.state       = EthernetState::DISCONNECTED;
+      ethData.state       = EthernetState::ETH_DISCONNECTED;
       ethData.isConnected = false;
       return false;
     }
     Serial.println("[ETH] DHCP failed");
-    ethData.state       = EthernetState::ERROR;
+    ethData.state       = EthernetState::ETH_ERROR;
     ethData.isConnected = false;
     return false;
   }
 
   ethData.isConnected    = true;
-  ethData.state          = EthernetState::CONNECTED;
+  ethData.state          = EthernetState::ETH_CONNECTED;
   ethData.lastConnectedMs = millis();
 
   IPAddress ip  = Ethernet.localIP();
@@ -204,7 +204,7 @@ bool ethernet_connect() {
 void ethernet_disconnect() {
   Ethernet.maintain();
   ethData.isConnected = false;
-  ethData.state       = EthernetState::DISCONNECTED;
+  ethData.state       = EthernetState::ETH_DISCONNECTED;
 }
 
 // ============================================================================
@@ -288,7 +288,7 @@ void ethernet_update() {
     if (Ethernet.linkStatus() == LinkOFF) {
       Serial.println("[ETH] Ethernet is offline");
       ethData.isConnected = false;
-      ethData.state       = EthernetState::DISCONNECTED;
+      ethData.state       = EthernetState::ETH_DISCONNECTED;
       return;
     }
 
@@ -327,12 +327,12 @@ EthernetData* ethernet_getData() {
 
 const char* ethernet_getStateName(EthernetState state) {
   switch (state) {
-    case EthernetState::DISABLED:      return "DISABLED";
-    case EthernetState::INITIALIZING:  return "INITIALIZING";
-    case EthernetState::CONNECTING:    return "CONNECTING";
-    case EthernetState::CONNECTED:     return "CONNECTED";
-    case EthernetState::DISCONNECTED:  return "DISCONNECTED";
-    case EthernetState::ERROR:         return "ERROR";
+    case EthernetState::ETH_DISABLED:      return "DISABLED";
+    case EthernetState::ETH_INITIALIZING:  return "INITIALIZING";
+    case EthernetState::ETH_CONNECTING:    return "CONNECTING";
+    case EthernetState::ETH_CONNECTED:     return "CONNECTED";
+    case EthernetState::ETH_DISCONNECTED:  return "DISCONNECTED";
+    case EthernetState::ETH_ERROR:         return "ERROR";
     default:                           return "UNKNOWN";
   }
 }
