@@ -1,5 +1,5 @@
-#ifndef AKWIFI_H
-#define AKWIFI_H
+#ifndef WIFIMANAGER_H
+#define WIFIMANAGER_H
 
 #include <Arduino.h>
 #include "Globals.h"
@@ -111,4 +111,4 @@ const char* wifi_getLocalIP();
  */
 const char* wifi_getStateName(WiFiState state);
 
-#endif // AKWIFI_H
+#endif // WIFIMANAGER_H

@@ -10,7 +10,7 @@
 #include "Sensors.h"
 #include "RTC.h"
 #include "EthernetNTP.h"
-#include "AKWiFi.h"
+#include "WifiManager.h"
 #include "Climate.h"
 #include "Heater.h"
 #include "Light.h"
