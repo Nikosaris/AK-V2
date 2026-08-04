@@ -65,7 +65,7 @@ void setup() {
 
   // WiFi (secondary NTP fallback)
   wifi_init();
-  wifi_connect("iphone (2)", "12345678");
+  wifi_connect("iPhone (2)", "12345678");
   Serial.println("[INIT] WiFi initialized (NTP fallback)");
 
   // Motors
