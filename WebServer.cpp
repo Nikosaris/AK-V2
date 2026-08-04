@@ -1097,14 +1097,16 @@ void webserver_update() {
     return;
   }
 
-  String request = client.readStringUntil('\n');
+  String request = client.readStringUntil('
+');
   request.trim();
 
   String method = request.substring(0, request.indexOf(' '));
   String path = request.substring(request.indexOf(' ') + 1, request.lastIndexOf(' '));
 
   while (client.available()) {
-    String line = client.readStringUntil('\n');
+    String line = client.readStringUntil('
+');
     if (line == "\r") break;
   }
 

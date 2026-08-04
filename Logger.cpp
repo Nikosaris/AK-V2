@@ -104,7 +104,8 @@ void logger_clearAll() {
 }
 
 void logger_printAll() {
-  Serial.println("\n========== LOG BUFFER ==========");
+  Serial.println("
+========== LOG BUFFER ==========");
   for (uint16_t i = 0; i < MAX_LOG_ENTRIES; i++) {
     if (logs[i].message != nullptr) {
       Serial.print(logs[i].timeStampMs);
