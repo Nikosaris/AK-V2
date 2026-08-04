@@ -3,6 +3,7 @@
 
 #include "Globals.h"
 #include "Motor.h"
+#include "Climate.h"
 
 // ============================================================================
 // SETTINGS MANAGEMENT
@@ -38,5 +39,15 @@ MotorConfig* settings_getDoorConfig();
  * Get window motor configuration
  */
 MotorConfig* settings_getWindowConfig();
+
+/**
+ * Apply and persist door motor configuration
+ */
+void settings_applyDoorConfig(const MotorConfig& cfg);
+
+/**
+ * Apply and persist window motor configuration
+ */
+void settings_applyWindowConfig(const MotorConfig& cfg);
 
 #endif // SETTINGS_H

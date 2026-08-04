@@ -24,12 +24,17 @@ enum class ClimateMode : uint8_t {
 struct ClimateConfig {
   ClimateMode mode = ClimateMode::MANUAL;
   
-  // Sunrise/Sunset times (for SCHEDULE mode)
+  // Sunrise/Sunset times (for SCHEDULE mode) - auto-computed from GPS
   uint8_t sunriseHour = 6;
   uint8_t sunriseMinute = 0;
   uint8_t sunsetHour = 20;
   uint8_t sunsetMinute = 0;
   
+  // GPS coordinates for automatic sunrise/sunset calculation
+  float latitude = 50.0f;             // Degrees North (e.g. 50.08 for Prague)
+  float longitude = 14.42f;           // Degrees East  (e.g. 14.42 for Prague)
+  int8_t timezoneOffsetH = 1;         // Base UTC offset WITHOUT DST (1 = CET). DST (+1 h) is added automatically.
+
   // Temperature thresholds
   float minTempC = 10.0f;             // Minimum comfortable temperature
   float maxTempC = 28.0f;             // Maximum comfortable temperature
@@ -41,6 +46,15 @@ struct ClimateConfig {
   
   // Hysteresis for window control
   float windowHysteresisC = 2.0f;     // Prevent chattering
+
+  // Time offsets relative to sunrise/sunset (minutes, can be negative)
+  int16_t doorOpenOffsetMin   =  15;  // Open door N minutes AFTER sunrise (positive = after)
+  int16_t doorCloseOffsetMin  =  20;  // Close door N minutes AFTER sunset  (positive = after)
+  int16_t cameraOnOffsetMin   = -30;  // Turn camera on N minutes before sunset (negative = before)
+  int16_t cameraOffOffsetMin  =   0;  // Turn camera off N minutes after door fully closed (0 = same time as close)
+
+  // Civil twilight option (6° below horizon instead of 0.833° standard)
+  bool useCivilTwilight = false;      // If true, use civil twilight for door scheduling
 };
 
 // ============================================================================
@@ -56,6 +70,24 @@ struct ClimateData {
   bool isNight = false;
   bool isSunrise = false;
   unsigned long lastUpdateMs = 0;
+
+  // Computed sun times (minutes from midnight, local time)
+  int16_t sunriseTotalMin = 360;    // Actual sunrise
+  int16_t sunsetTotalMin  = 1200;   // Actual sunset
+  int16_t civilDawnMin    = 330;    // Civil dawn  (6° below horizon)
+  int16_t civilDuskMin    = 1230;   // Civil dusk  (6° below horizon)
+  uint16_t dayLengthMin   = 840;    // Length of day in minutes
+
+  // Effective action times (sunrise/sunset + offsets)
+  int16_t doorOpenEffectiveMin  = 375;  // = sunriseTotalMin + doorOpenOffsetMin
+  int16_t doorCloseEffectiveMin = 1220; // = sunsetTotalMin  + doorCloseOffsetMin
+  int16_t cameraOnEffectiveMin  = 1170; // = sunsetTotalMin  + cameraOnOffsetMin
+  int16_t cameraOffEffectiveMin = 1220; // = doorCloseEffectiveMin + cameraOffOffsetMin
+
+  // Last calculation date
+  uint8_t lastCalcDay   = 0;
+  uint8_t lastCalcMonth = 0;
+  uint16_t lastCalcYear = 0;
 };
 
 // ============================================================================
@@ -123,5 +155,15 @@ ClimateData* climate_getData();
  * Get mode name
  */
 const char* climate_getModeName(ClimateMode mode);
+
+/**
+ * Recalculate sunrise and sunset times from GPS coordinates and current date.
+ * Updates climateConfig.sunriseHour/Minute and sunsetHour/Minute.
+ * Uses a simplified NOAA solar algorithm accurate to ±1 minute.
+ * @param year  - full year (e.g. 2025)
+ * @param month - month 1-12
+ * @param day   - day 1-31
+ */
+void climate_recalculateSunTimes(uint16_t year, uint8_t month, uint8_t day);
 
 #endif // CLIMATE_H

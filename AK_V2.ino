@@ -7,13 +7,76 @@
 #include "Hardware.h"
 #include "Motor.h"
 #include "Settings.h"
+#include "Sensors.h"
+#include "RTC.h"
+#include "Climate.h"
+#include "Heater.h"
+#include "Light.h"
+#include "Alarm.h"
+#include "Logger.h"
+#include "OTA.h"
+#include "WebServer.h"
+#include "Ethernet.h"
+#include "WiFi.h"
+#include <cstring>
+
+// Compatibility fallback for builds where Motor.cpp is not linked by the IDE
+Motor doorMotor __attribute__((weak));
+Motor windowMotor __attribute__((weak));
+
+void wifi_init();
+void wifi_update();
+bool wifi_connect(const char* ssid, const char* password);
+bool wifi_isConnected();
+const char* wifi_getLocalIP();
+
+static constexpr bool AKV2_USE_ETHERNET_PRIMARY = true;
+static constexpr bool AKV2_USE_WIFI_FALLBACK = true;
+static constexpr const char* AKV2_WIFI_DEBUG_SSID = "";
+static constexpr const char* AKV2_WIFI_DEBUG_PASSWORD = "";
+static constexpr uint32_t AKV2_ETHERNET_WIFI_FALLBACK_DELAY_MS = 10000;
 
 // ============================================================================
 // MOTOR INSTANCES
 // ============================================================================
 
-static Motor doorMotor;
-static Motor windowMotor;
+static unsigned long networkInitTimeMs = 0;
+static bool webServerActive = false;
+
+static void tryWiFiFallback() {
+  if (!AKV2_USE_WIFI_FALLBACK) {
+    return;
+  }
+
+  if (strlen(AKV2_WIFI_DEBUG_SSID) == 0) {
+    return;
+  }
+
+  if (!wifi_isConnected()) {
+    wifi_connect(AKV2_WIFI_DEBUG_SSID, AKV2_WIFI_DEBUG_PASSWORD);
+    Serial.println("[NET] WiFi fallback connect requested");
+  }
+}
+
+static bool networkHasConnectivity() {
+  return wifi_isConnected() || (AKV2_USE_ETHERNET_PRIMARY && ethernet_isConnected());
+}
+
+static void updateNetworkServices() {
+  if (networkHasConnectivity()) {
+    if (!webServerActive && webserver_start()) {
+      webServerActive = true;
+      Serial.println("[NET] Web server started");
+    }
+    return;
+  }
+
+  if (webServerActive) {
+    webserver_stop();
+    webServerActive = false;
+    Serial.println("[NET] Web server stopped");
+  }
+}
 
 // ============================================================================
 // SETUP - Initialization
@@ -27,12 +90,16 @@ void setup() {
   Serial.println("\n\n=================================================================================");
   Serial.println("AK-V2: Professional Chicken Coop Automation Firmware");
   Serial.println("Platform: ESP32-WROOM-32");
-  Serial.println("Version: 0.1.0");
+  Serial.println("Version: 0.2.0");
   Serial.println("=================================================================================");
 
   // Initialize globals
   globals_init();
   Serial.println("[INIT] Globals initialized");
+
+  // Initialize logging
+  logger_init();
+  Serial.println("[INIT] Logger initialized");
 
   // Initialize hardware (GPIO, PWM, etc.)
   hardware_init();
@@ -42,14 +109,59 @@ void setup() {
   settings_init();
   Serial.println("[INIT] Settings loaded");
 
+  // Initialize sensor layer
+  sensors_init();
+  Serial.println("[INIT] Sensors initialized");
+
+  // Initialize timekeeping and automation support modules
+  rtc_init();
+  Serial.println("[INIT] RTC initialized");
+
+  // Initialize networking (Ethernet primary, WiFi fallback for debugging)
+  webserver_init();
+  Serial.println("[INIT] Web server initialized");
+
+  ota_init();
+  Serial.println("[INIT] OTA initialized");
+
+  wifi_init();
+  if (AKV2_USE_ETHERNET_PRIMARY) {
+    ethernet_init();
+  }
+  networkInitTimeMs = millis();
+  if (AKV2_USE_ETHERNET_PRIMARY && ethernet_connect()) {
+    Serial.println("[NET] Ethernet W5500 initialization started (primary)");
+    rtc_syncNTP();
+    Serial.println("[INIT] NTP time synchronized");
+  } else {
+    Serial.println("[NET] Ethernet init failed, trying WiFi fallback");
+    tryWiFiFallback();
+    if (wifi_isConnected()) {
+      rtc_syncNTP();
+      Serial.println("[INIT] NTP time synchronized via WiFi");
+    }
+  }
+
   // Initialize motor structures
-  motor_init(&doorMotor, "Door", PWM_CHANNEL_DOOR_IN1, PWM_CHANNEL_DOOR_IN2);
+  motor_init(&doorMotor, "Door", DOOR_IN1_PIN, DOOR_IN2_PIN);
   doorMotor.config = *settings_getDoorConfig();
   Serial.println("[INIT] Door motor initialized");
 
-  motor_init(&windowMotor, "Window", PWM_CHANNEL_WINDOW_IN1, PWM_CHANNEL_WINDOW_IN2);
+  motor_init(&windowMotor, "Window", WINDOW_IN1_PIN, WINDOW_IN2_PIN);
   windowMotor.config = *settings_getWindowConfig();
   Serial.println("[INIT] Window motor initialized");
+
+  alarm_init();
+  Serial.println("[INIT] Alarm system initialized");
+
+  heater_init();
+  Serial.println("[INIT] Heater initialized");
+
+  light_init();
+  Serial.println("[INIT] Light initialized");
+
+  climate_init();
+  Serial.println("[INIT] Climate automation initialized");
 
   Serial.println("\n[INIT] System startup complete. Ready to operate.\n");
 }
@@ -66,6 +178,34 @@ void loop() {
 
   // Update hardware state
   hardware_update();
+
+  // Update sensor layer
+  sensors_update();
+
+  // Update timekeeping
+  rtc_update();
+
+  // Update network managers
+  if (AKV2_USE_ETHERNET_PRIMARY) {
+    ethernet_update();
+  }
+  wifi_update();
+
+  // Ethernet is primary; if unavailable for some time, allow WiFi fallback
+  if ((!AKV2_USE_ETHERNET_PRIMARY || !ethernet_isConnected()) &&
+      (millis() - networkInitTimeMs) > AKV2_ETHERNET_WIFI_FALLBACK_DELAY_MS) {
+    tryWiFiFallback();
+  }
+
+  updateNetworkServices();
+  webserver_update();
+  ota_update();
+
+  // Update automation/support modules
+  alarm_update();
+  heater_update();
+  light_update();
+  climate_update();
 
   // Core motor control - STATE MACHINE UPDATES
   motor_update(&doorMotor);
@@ -105,5 +245,28 @@ void logSystemStatus() {
   Serial.print(motor_getStateName(windowMotor.data.state));
   Serial.print(" (I=");
   Serial.print(windowMotor.data.currentMA);
-  Serial.println("mA)");
+  Serial.print("mA) | Temp: ");
+
+  if (coopEnvironment.isValid) {
+    Serial.print(coopEnvironment.temperatureC, 1);
+    Serial.print("C");
+  } else {
+    Serial.print("N/A");
+  }
+
+  Serial.print(" | Net: ");
+  if (AKV2_USE_ETHERNET_PRIMARY && ethernet_isConnected()) {
+    Serial.print("ETH ");
+    Serial.print(ethernet_getLocalIP());
+  } else if (wifi_isConnected()) {
+    Serial.print("WIFI ");
+    Serial.print(wifi_getLocalIP());
+  } else {
+    Serial.print("OFFLINE");
+  }
+
+  Serial.print(" | Climate: ");
+  Serial.print(climate_getModeName(climate_getMode()));
+  Serial.print(" | Alarms: ");
+  Serial.println(alarm_getActiveCount());
 }

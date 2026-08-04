@@ -23,10 +23,16 @@ struct TimeData {
 // ============================================================================
 
 /**
- * Initialize RTC module
- * NOTE: Requires DS3231 or similar RTC on I2C bus
+ * Initialize NTP time synchronization
+ * NOTE: Requires active network connection (WiFi or Ethernet)
  */
 void rtc_init();
+
+/**
+ * Synchronize time from NTP server
+ * Should be called after network connection is established
+ */
+void rtc_syncNTP();
 
 /**
  * Update RTC and internal timing

@@ -82,10 +82,13 @@ struct MotorData {
 struct Motor {
   MotorConfig config;
   MotorData data;
-  uint8_t pwmChannelIn1;
-  uint8_t pwmChannelIn2;
+  uint8_t drivePinIn1;
+  uint8_t drivePinIn2;
   const char* name;
 };
+
+extern Motor doorMotor;
+extern Motor windowMotor;
 
 // ============================================================================
 // MOTOR INITIALIZATION AND UPDATE
@@ -95,10 +98,10 @@ struct Motor {
  * Initialize motor structure with default values
  * @param motor - pointer to motor structure
  * @param name - descriptive name (e.g., "Door", "Window")
- * @param pwmCh1 - PWM channel for IN1
- * @param pwmCh2 - PWM channel for IN2
+ * @param drivePin1 - H-bridge drive pin for IN1
+ * @param drivePin2 - H-bridge drive pin for IN2
  */
-void motor_init(Motor* motor, const char* name, uint8_t pwmCh1, uint8_t pwmCh2);
+void motor_init(Motor* motor, const char* name, uint8_t drivePin1, uint8_t drivePin2);
 
 /**
  * Update motor state machine - CORE CONTROL FUNCTION

@@ -1,13 +1,16 @@
 #include "Motor.h"
 
+Motor doorMotor;
+Motor windowMotor;
+
 // ============================================================================
 // MOTOR INITIALIZATION
 // ============================================================================
 
-void motor_init(Motor* motor, const char* name, uint8_t pwmCh1, uint8_t pwmCh2) {
+void motor_init(Motor* motor, const char* name, uint8_t drivePin1, uint8_t drivePin2) {
   motor->name = name;
-  motor->pwmChannelIn1 = pwmCh1;
-  motor->pwmChannelIn2 = pwmCh2;
+  motor->drivePinIn1 = drivePin1;
+  motor->drivePinIn2 = drivePin2;
   motor->data.state = MotorState::STOPPED;
   motor->data.command = MotorCommand::NONE;
   motor->data.topLimit = false;
@@ -27,24 +30,24 @@ void motor_init(Motor* motor, const char* name, uint8_t pwmCh1, uint8_t pwmCh2) 
  * Does NOT change state - only stops PWM
  */
 static void motor_stopOutput(Motor* motor) {
-  ledcWrite(motor->pwmChannelIn1, 0);
-  ledcWrite(motor->pwmChannelIn2, 0);
+  ledcWrite(motor->drivePinIn1, 0);
+  ledcWrite(motor->drivePinIn2, 0);
 }
 
 /**
  * Set motor to open direction with given PWM
  */
 static void motor_driveOpen(Motor* motor, uint8_t pwm) {
-  ledcWrite(motor->pwmChannelIn1, pwm);
-  ledcWrite(motor->pwmChannelIn2, 0);
+  ledcWrite(motor->drivePinIn1, pwm);
+  ledcWrite(motor->drivePinIn2, 0);
 }
 
 /**
  * Set motor to close direction with given PWM
  */
 static void motor_driveClose(Motor* motor, uint8_t pwm) {
-  ledcWrite(motor->pwmChannelIn1, 0);
-  ledcWrite(motor->pwmChannelIn2, pwm);
+  ledcWrite(motor->drivePinIn1, 0);
+  ledcWrite(motor->drivePinIn2, pwm);
 }
 
 /**
