@@ -65,6 +65,7 @@ void setup() {
 
   // WiFi (secondary NTP fallback)
   wifi_init();
+  wifi_connect("iphone (2)", "12345678");
   Serial.println("[INIT] WiFi initialized (NTP fallback)");
 
   // Motors
@@ -97,6 +98,7 @@ void setup() {
   Serial.println("[INIT] OTA initialized");
 
   webserver_init();
+  webserver_start();
   Serial.println("[INIT] WebServer initialized");
 
   Serial.println("\n[INIT] System startup complete. Ready to operate.\n");
