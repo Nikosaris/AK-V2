@@ -10,6 +10,13 @@
 #include "RTC.h"
 #include "EthernetNTP.h"
 #include "WiFi.h"
+#include "Climate.h"
+#include "Heater.h"
+#include "Light.h"
+#include "Alarm.h"
+#include "Logger.h"
+#include "OTA.h"
+#include "WebServer.h"
 
 // ============================================================================
 // MOTOR INSTANCES
@@ -19,7 +26,7 @@ static Motor doorMotor;
 static Motor windowMotor;
 
 // ============================================================================
-// SETUP - Initialization
+// SETUP
 // ============================================================================
 
 void setup() {
@@ -32,6 +39,7 @@ void setup() {
   Serial.println("Version: 0.1.0");
   Serial.println("=================================================================================");
 
+  // Core system
   globals_init();
   Serial.println("[INIT] Globals initialized");
 
@@ -41,21 +49,21 @@ void setup() {
   settings_init();
   Serial.println("[INIT] Settings loaded");
 
-  // ---- Ethernet init (highest priority NTP source) ----
+  // Ethernet (highest priority NTP source)
   Serial.println("\n[INIT] === Network initialization ===");
   ethernet_init();
   Serial.println("[INIT] Ethernet W5500 initialized (RESET: GPIO2)");
 
-  // ---- RTC init (DS3231 + EEPROM fallback) ----
+  // RTC (DS3231 + EEPROM fallback)
   Serial.println("[INIT] === Time initialization ===");
   rtc_init();
   Serial.println("[INIT] RTC initialized");
 
-  // ---- WiFi init (secondary NTP fallback) ----
+  // WiFi (secondary NTP fallback)
   wifi_init();
   Serial.println("[INIT] WiFi initialized (NTP fallback)");
 
-  // ---- Motor init ----
+  // Motors
   motor_init(&doorMotor, "Door", PWM_CHANNEL_DOOR_IN1, PWM_CHANNEL_DOOR_IN2);
   doorMotor.config = *settings_getDoorConfig();
   Serial.println("[INIT] Door motor initialized");
@@ -64,11 +72,34 @@ void setup() {
   windowMotor.config = *settings_getWindowConfig();
   Serial.println("[INIT] Window motor initialized");
 
+  // Automation modules
+  climate_init();
+  Serial.println("[INIT] Climate initialized");
+
+  heater_init();
+  Serial.println("[INIT] Heater initialized");
+
+  light_init();
+  Serial.println("[INIT] Light initialized");
+
+  alarm_init();
+  Serial.println("[INIT] Alarm initialized");
+
+  // Services
+  logger_init();
+  Serial.println("[INIT] Logger initialized");
+
+  ota_init();
+  Serial.println("[INIT] OTA initialized");
+
+  webserver_init();
+  Serial.println("[INIT] WebServer initialized");
+
   Serial.println("\n[INIT] System startup complete. Ready to operate.\n");
 }
 
 // ============================================================================
-// LOOP - Main control loop
+// LOOP
 // ============================================================================
 
 void loop() {
@@ -77,44 +108,54 @@ void loop() {
   globals_update();
   hardware_update();
 
-  // ---- Network + Time updates (priority order) ----
+  // Network + Time (priority order)
   ethernet_update();
   rtc_update();
   wifi_update();
 
-  // ---- Motor state machines ----
+  // Motor state machines
   motor_update(&doorMotor);
   motor_update(&windowMotor);
 
-  // ---- EEPROM backup every minute ----
-  static unsigned long lastEEPROMSaveMs = 0;
+  // Automation modules
+  climate_update();
+  heater_update();
+  light_update();
+  alarm_update();
+
+  // Services
+  ota_update();
+  webserver_update();
+
   unsigned long now = millis();
+
+  // EEPROM backup every minute
+  static unsigned long lastEEPROMSaveMs = 0;
   if (now - lastEEPROMSaveMs >= 60000) {
     lastEEPROMSaveMs = now;
     rtc_saveToEEPROM();
   }
 
-  // ---- Periodic NTP sync every 24h (if Ethernet offline, try WiFi) ----
+  // NTP fallback check every 24h
   static unsigned long lastNTPCheckMs = 0;
   if (now - lastNTPCheckMs >= NTP_SYNC_INTERVAL_MS) {
     lastNTPCheckMs = now;
     if (!ethernet_isConnected()) {
       if (wifi_isConnected()) {
         Serial.println("[RTC] Fallback to WiFi NTP...");
-        // WiFi NTP sync handled separately; DS3231 maintains time locally
       } else {
         Serial.println("[RTC] \xe2\x9a\xa0\xef\xb8\x8f  All networks offline - running on DS3231");
       }
     }
   }
 
-  // ---- Periodic serial logging (every 1 second) ----
+  // Serial log every 1 second
   if (now - lastSerialLogTime >= SERIAL_LOG_INTERVAL_MS) {
     lastSerialLogTime = now;
     logSystemStatus();
   }
 
-  // ---- Frame rate limiting (~20 Hz) ----
+  // Frame rate ~20 Hz
   unsigned long loopDuration = millis() - loopStartTime;
   if (loopDuration < LOOP_INTERVAL_MS) {
     delayMicroseconds((LOOP_INTERVAL_MS - loopDuration) * 1000);
@@ -122,7 +163,7 @@ void loop() {
 }
 
 // ============================================================================
-// LOGGING AND DIAGNOSTICS
+// LOGGING
 // ============================================================================
 
 void logSystemStatus() {
