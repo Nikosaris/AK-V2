@@ -10,12 +10,12 @@
 // ============================================================================
 
 enum class EthernetState : uint8_t {
-  ETH_DISABLED = 0,
-  ETH_INITIALIZING = 1,
-  ETH_CONNECTING = 2,
-  ETH_CONNECTED = 3,
-  ETH_DISCONNECTED = 4,
-  ETH_ERROR = 5
+  Disabled = 0,
+  Initializing = 1,
+  Connecting = 2,
+  Connected = 3,
+  Disconnected = 4,
+  Error = 5
 };
 
 // ============================================================================
