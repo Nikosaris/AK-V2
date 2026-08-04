@@ -7,6 +7,7 @@
 #include "Hardware.h"
 #include "Motor.h"
 #include "Settings.h"
+#include "Sensors.h"
 #include "RTC.h"
 #include "EthernetNTP.h"
 #include "WiFi.h"
@@ -48,6 +49,9 @@ void setup() {
 
   settings_init();
   Serial.println("[INIT] Settings loaded");
+
+  sensors_init();
+  Serial.println("[INIT] Sensors initialized");
 
   // Ethernet (highest priority NTP source)
   Serial.println("\n[INIT] === Network initialization ===");
@@ -107,6 +111,7 @@ void loop() {
 
   globals_update();
   hardware_update();
+  sensors_update();
 
   // Network + Time (priority order)
   ethernet_update();
