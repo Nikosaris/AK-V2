@@ -68,6 +68,23 @@ void setup() {
   wifi_connect("iPhone (2)", "12345678");
   Serial.println("[INIT] WiFi initialized (NTP fallback)");
 
+  // Wait briefly for WiFi to connect, then sync NTP
+  {
+    unsigned long wifiWaitStart = millis();
+    Serial.print("[INIT] Cekam na WiFi pripojeni...");
+    while (!wifi_isConnected() && millis() - wifiWaitStart < 15000) {
+      wifi_update();
+      delay(200);
+      Serial.print(".");
+    }
+    Serial.println();
+    if (wifi_isConnected()) {
+      wifi_ntpSync();
+    } else {
+      Serial.println("[INIT] WiFi nepripojeno - NTP sync preskocen");
+    }
+  }
+
   // Motors
   motor_init(&doorMotor, "Door", PWM_CHANNEL_DOOR_IN1, PWM_CHANNEL_DOOR_IN2);
   doorMotor.config = *settings_getDoorConfig();
@@ -150,6 +167,7 @@ void loop() {
     if (!ethernet_isConnected()) {
       if (wifi_isConnected()) {
         Serial.println("[RTC] Fallback to WiFi NTP...");
+        wifi_ntpSync();
       } else {
         Serial.println("[RTC] \xe2\x9a\xa0\xef\xb8\x8f  All networks offline - running on DS3231");
       }

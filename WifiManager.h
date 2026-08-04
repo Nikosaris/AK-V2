@@ -111,4 +111,11 @@ const char* wifi_getLocalIP();
  */
 const char* wifi_getStateName(WiFiState state);
 
+/**
+ * Synchronize time via NTP over WiFi
+ * Fills provided TimeData struct and calls rtc_syncFromNTP()
+ * @return true if sync succeeded
+ */
+bool wifi_ntpSync();
+
 #endif // WIFIMANAGER_H
