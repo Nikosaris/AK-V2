@@ -1,5 +1,5 @@
-#ifndef WIFI_H
-#define WIFI_H
+#ifndef WIFIMANAGER_H
+#define WIFIMANAGER_H
 
 #include <Arduino.h>
 #include "Globals.h"
@@ -12,7 +12,8 @@ enum class WiFiState : uint8_t {
   DISCONNECTED = 0,   // Not connected
   CONNECTING = 1,     // Attempting to connect
   CONNECTED = 2,      // Connected to WiFi
-  ERROR = 3           // Connection error
+  NTP_SYNC = 3,       // Performing NTP synchronisation after connect
+  ERROR = 4           // Connection error
 };
 
 // ============================================================================
@@ -26,6 +27,9 @@ struct WiFiConfig {
   uint32_t retryDelayMs = 5000;
   bool autoConnect = true;
   uint32_t connectionTimeoutMs = 30000;  // 30 seconds
+  char ntpServer[64] = "pool.ntp.org";
+  int32_t timezoneOffsetSeconds = 3600;  // UTC+1 default (CET); adjust as needed
+  uint32_t ntpSyncIntervalMs = 3600000;  // Re-sync NTP every hour
 };
 
 // ============================================================================
@@ -40,6 +44,8 @@ struct WiFiData {
   unsigned long connectionDurationMs = 0;
   char localIP[16] = "";
   int8_t signalStrength = 0;  // RSSI in dBm
+  bool ntpSynced = false;
+  unsigned long lastNtpSyncMs = 0;
 };
 
 // ============================================================================
@@ -58,8 +64,7 @@ extern WiFiData wifiData;
 void wifi_init();
 
 /**
- * Update WiFi state machine
- * Should be called in main loop
+ * Update WiFi state machine (call every loop)
  */
 void wifi_update();
 
@@ -67,7 +72,7 @@ void wifi_update();
  * Connect to WiFi network
  * @param ssid - network SSID
  * @param password - network password
- * @return - true if connection initiated
+ * @return true if connection initiated
  */
 bool wifi_connect(const char* ssid, const char* password);
 
@@ -111,4 +116,4 @@ const char* wifi_getLocalIP();
  */
 const char* wifi_getStateName(WiFiState state);
 
-#endif // WIFI_H
+#endif // WIFIMANAGER_H
