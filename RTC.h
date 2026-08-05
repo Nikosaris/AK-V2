@@ -68,9 +68,35 @@ bool rtc_setTime(TimeData* time);
 bool rtc_syncFromNTP(unsigned long unixTime, int32_t timezoneOffsetSeconds);
 
 /**
+ * Synchronise time directly from a TimeData struct (e.g. from EthernetNTP).
+ * Marks source as NTP and writes to DS3231 if present.
+ * @param time - pointer to TimeData with the new time
+ * @return true if successful
+ */
+bool rtc_syncFromNTP(TimeData* time);
+
+/**
  * Get current time source.
  */
 RTCSource rtc_getSource();
+
+/**
+ * Alias for rtc_getSource() — used by AK_V2.ino logSystemStatus().
+ */
+RTCSource rtc_getCurrentSource();
+
+/**
+ * Get human-readable name for a time source.
+ * @param source - RTCSource value
+ * @return source name string (e.g. "DS3231", "NTP", "MILLIS")
+ */
+const char* rtc_getSourceName(RTCSource source);
+
+/**
+ * Save current time to EEPROM as a backup.
+ * Called periodically from loop() so time survives power loss without DS3231.
+ */
+void rtc_saveToEEPROM();
 
 /**
  * Get current Unix timestamp (seconds since 1970-01-01 00:00:00 UTC).

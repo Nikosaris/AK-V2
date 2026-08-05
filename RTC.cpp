@@ -1,5 +1,6 @@
 #include "RTC.h"
 #include <Wire.h>
+#include <EEPROM.h>
 
 // ============================================================================
 // RTC DATA AND CONSTANTS
@@ -270,8 +271,58 @@ bool rtc_syncFromNTP(unsigned long unixTime, int32_t timezoneOffsetSeconds) {
   return true;
 }
 
+bool rtc_syncFromNTP(TimeData* time) {
+  if (time == nullptr) return false;
+
+  currentTime = *time;
+  rtcValid    = true;
+  currentSource = RTCSource::NTP;
+  lastMillisUpdateMs = millis();
+
+  // Write back to DS3231 to persist time across reboots
+  if (ds3231_probe()) {
+    ds3231_writeTime();
+    currentSource = RTCSource::DS3231;
+    Serial.println("[RTC] NTP time (TimeData) written to DS3231");
+  } else {
+    Serial.println("[RTC] NTP time (TimeData) set (no DS3231 to persist)");
+  }
+  return true;
+}
+
 RTCSource rtc_getSource() {
   return currentSource;
+}
+
+RTCSource rtc_getCurrentSource() {
+  return currentSource;
+}
+
+const char* rtc_getSourceName(RTCSource source) {
+  switch (source) {
+    case RTCSource::DS3231: return "DS3231";
+    case RTCSource::NTP:    return "NTP";
+    case RTCSource::MILLIS: return "MILLIS";
+    default:                return "UNKNOWN";
+  }
+}
+
+void rtc_saveToEEPROM() {
+  // EEPROM backup — writes current time so it survives power loss.
+  // Uses EEPROM addresses 0-7 (1 byte each field).
+  // Format: [magic(0xAB)] [year] [month] [day] [hour] [minute] [second] [dayOfWeek]
+  const uint8_t EEPROM_MAGIC   = 0xAB;
+  const int     EEPROM_ADDRESS = 0;
+
+  EEPROM.write(EEPROM_ADDRESS + 0, EEPROM_MAGIC);
+  EEPROM.write(EEPROM_ADDRESS + 1, currentTime.year);
+  EEPROM.write(EEPROM_ADDRESS + 2, currentTime.month);
+  EEPROM.write(EEPROM_ADDRESS + 3, currentTime.day);
+  EEPROM.write(EEPROM_ADDRESS + 4, currentTime.hour);
+  EEPROM.write(EEPROM_ADDRESS + 5, currentTime.minute);
+  EEPROM.write(EEPROM_ADDRESS + 6, currentTime.second);
+  EEPROM.write(EEPROM_ADDRESS + 7, currentTime.dayOfWeek);
+  EEPROM.commit();
 }
 
 unsigned long rtc_getUnixTime() {
