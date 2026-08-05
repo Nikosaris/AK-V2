@@ -8,7 +8,7 @@
 #include "Motor.h"
 #include "Settings.h"
 #include "RTC.h"
-#include "WiFi.h"
+#include "WifiManager.h"
 #include "Climate.h"
 
 // ============================================================================
