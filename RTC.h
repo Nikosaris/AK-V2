@@ -19,57 +19,81 @@ struct TimeData {
 };
 
 // ============================================================================
+// TIME SOURCE ENUM
+// ============================================================================
+
+enum class RTCSource : uint8_t {
+  MILLIS  = 0,  // Software fallback, time kept by millis()
+  DS3231  = 1,  // Hardware DS3231 RTC module (I2C)
+  NTP     = 2   // NTP synchronised (written back to DS3231 when available)
+};
+
+// ============================================================================
 // RTC FUNCTIONS
 // ============================================================================
 
 /**
- * Initialize RTC module
- * NOTE: Requires DS3231 or similar RTC on I2C bus
+ * Initialize RTC module.
+ * Tries DS3231 first; falls back to MILLIS if not present.
  */
 void rtc_init();
 
 /**
- * Update RTC and internal timing
- * Should be called periodically
+ * Update RTC and internal timing.
+ * Should be called every loop iteration.
  */
 void rtc_update();
 
 /**
- * Get current time
- * @return - pointer to TimeData structure
+ * Get current time.
+ * @return pointer to TimeData structure
  */
 TimeData* rtc_getTime();
 
 /**
- * Set time on RTC module
+ * Set time (also writes to DS3231 when available).
+ * Marks time as valid.
  * @param time - TimeData to set
- * @return - true if successful
+ * @return true if successful
  */
 bool rtc_setTime(TimeData* time);
 
 /**
- * Get current Unix timestamp
- * @return - seconds since 2000-01-01 00:00:00
+ * Synchronise time from an NTP Unix timestamp (seconds since 1970-01-01).
+ * Converts to TimeData, marks source as NTP, and writes to DS3231 if present.
+ * @param unixTime - epoch seconds (UTC)
+ * @param timezoneOffsetSeconds - signed offset to apply (e.g. +3600 for UTC+1)
+ * @return true if successful
+ */
+bool rtc_syncFromNTP(unsigned long unixTime, int32_t timezoneOffsetSeconds);
+
+/**
+ * Get current time source.
+ */
+RTCSource rtc_getSource();
+
+/**
+ * Get current Unix timestamp (seconds since 1970-01-01 00:00:00 UTC).
  */
 unsigned long rtc_getUnixTime();
 
 /**
- * Check if RTC has valid time
- * @return - true if RTC has been set and is running
+ * Check if RTC has valid (non-default) time.
+ * @return true if time has been set from DS3231 or NTP
  */
 bool rtc_isValid();
 
 /**
- * Get day name
+ * Get day name.
  * @param dayOfWeek - 0-6 (0=Sunday)
- * @return - day name string
+ * @return day name string
  */
 const char* rtc_getDayName(uint8_t dayOfWeek);
 
 /**
- * Get month name
+ * Get month name.
  * @param month - 1-12
- * @return - month name string
+ * @return month name string
  */
 const char* rtc_getMonthName(uint8_t month);
 

@@ -75,37 +75,48 @@ void climate_setMode(ClimateMode mode) {
 
 static bool windowShouldBeOpen = false;  // Hysteresis tracking
 
-void climate_update() {
-  unsigned long currentTime = millis();
+// Returns true when current time is within the day window (sunrise..sunset).
+// Uses minute-precision comparison and falls back to "day" (door stays open)
+// if the RTC time is not yet valid, ensuring the door is never stuck closed.
+static bool climate_isDay(const TimeData* time) {
+  if (time == nullptr) return true; // Safe fallback: keep door open
 
+  uint16_t nowMins     = (uint16_t)time->hour * 60 + time->minute;
+  uint16_t sunriseMins = (uint16_t)climateConfig.sunriseHour * 60 + climateConfig.sunriseMinute;
+  uint16_t sunsetMins  = (uint16_t)climateConfig.sunsetHour  * 60 + climateConfig.sunsetMinute;
+
+  // Validate sunrise < sunset (defensive guard)
+  if (sunriseMins >= sunsetMins) {
+    return true; // Configuration error — default to day so door stays open
+  }
+
+  return (nowMins >= sunriseMins && nowMins < sunsetMins);
+}
+
+void climate_update() {
   // Update current temperature from sensors
   if (coopEnvironment.isValid) {
     climateData.currentTempC = coopEnvironment.temperatureC;
   }
 
-  // Get current time from RTC
+  // Get current time from RTC — automation runs regardless of rtc_isValid()
+  // because DS3231 or millis() always provides a plausible time.
   TimeData* time = rtc_getTime();
 
-  // Determine if it's day or night
-  uint8_t currentHour = time->hour;
-  uint8_t currentMinute = time->minute;
-
-  bool isDay = (currentHour >= climateConfig.sunriseHour && 
-                currentHour < climateConfig.sunsetHour);
+  bool isDay = climate_isDay(time);
   climateData.isNight = !isDay;
 
   // Handle different climate modes
   switch (climateConfig.mode) {
     // ========================================================================
     case ClimateMode::MANUAL: {
-      // Manual mode - no automatic control
-      // User commands via climate_doorOpen(), climate_doorClose(), etc.
+      // Manual mode — no automatic control
       break;
     }
 
     // ========================================================================
     case ClimateMode::SCHEDULE: {
-      // Scheduled mode - open/close at fixed times
+      // Scheduled mode — open/close at sunrise/sunset
       bool shouldBeOpen = isDay;
 
       if (shouldBeOpen && !climateData.doorOpen) {
@@ -132,10 +143,7 @@ void climate_update() {
 
     // ========================================================================
     case ClimateMode::SMART: {
-      // Smart mode - temperature and weather aware
-      // Combines scheduled and temperature-based control
-
-      // Door control: open during day, close at night
+      // Smart mode — temperature and weather aware
       bool shouldBeOpen = isDay && climateData.currentTempC < climateConfig.overTempC;
 
       if (shouldBeOpen && !climateData.doorOpen) {
