@@ -2,41 +2,18 @@
 #define SETTINGS_H
 
 #include "Globals.h"
-#include "Motor.h"
+#include "Door.h"
+#include "Window.h"
 
-// ============================================================================
-// SETTINGS MANAGEMENT
-// ============================================================================
-
-/**
- * Initialize settings system
- * Load configuration from EEPROM or use defaults
- */
 void settings_init();
-
-/**
- * Load all settings from EEPROM
- */
 void settings_load();
-
-/**
- * Save all settings to EEPROM
- */
 void settings_save();
-
-/**
- * Reset to factory defaults
- */
 void settings_reset();
 
-/**
- * Get door motor configuration
- */
-MotorConfig* settings_getDoorConfig();
+DoorConfig* settings_getDoorConfig();
+WindowConfig* settings_getWindowConfig();
 
-/**
- * Get window motor configuration
- */
-MotorConfig* settings_getWindowConfig();
+void settings_applyDoorConfig(const DoorConfig& cfg);
+void settings_applyWindowConfig(const WindowConfig& cfg);
 
 #endif // SETTINGS_H
