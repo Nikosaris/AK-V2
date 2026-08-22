@@ -1194,3 +1194,12 @@ const char* webserver_getStateName(WebServerState state) {
     default:                      return "UNKNOWN";
   }
 }
+
+void webserver_handleAPI(const char* endpoint, const char* method, const char* body) {
+  // API routing is handled inline in webserver_update().
+  // Log a warning if this path is reached unexpectedly.
+  Serial.print("[WEBSERVER] webserver_handleAPI called for: ");
+  Serial.println(endpoint ? endpoint : "(null)");
+  (void)method;
+  (void)body;
+}
