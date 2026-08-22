@@ -2,7 +2,6 @@
 #define SETTINGS_H
 
 #include "Globals.h"
-#include "Motor.h"
 
 // ============================================================================
 // SETTINGS MANAGEMENT

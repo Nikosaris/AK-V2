@@ -1,8 +1,3 @@
-// ============================================================================
-// AK-V2: Professional Chicken Coop Automation Firmware
-// Platform: ESP32-WROOM-32
-// ============================================================================
-
 #include "Globals.h"
 #include "Hardware.h"
 #include "Motor.h"
