@@ -3,7 +3,8 @@
 
 #include <Arduino.h>
 #include "Globals.h"
-#include "Motor.h"
+#include "Door.h"
+#include "Window.h"
 #include "Heater.h"
 #include "Light.h"
 
@@ -12,9 +13,9 @@
 // ============================================================================
 
 enum class ClimateMode : uint8_t {
-  MANUAL = 0,        // Manual control - user commands only
-  SCHEDULE = 1,      // Scheduled automation (sunrise/sunset)
-  SMART = 2          // Smart mode (weather-dependent)
+  MANUAL = 0,
+  SCHEDULE = 1,
+  SMART = 2
 };
 
 // ============================================================================
@@ -23,24 +24,16 @@ enum class ClimateMode : uint8_t {
 
 struct ClimateConfig {
   ClimateMode mode = ClimateMode::MANUAL;
-  
-  // Sunrise/Sunset times (for SCHEDULE mode)
   uint8_t sunriseHour = 6;
   uint8_t sunriseMinute = 0;
   uint8_t sunsetHour = 20;
   uint8_t sunsetMinute = 0;
-  
-  // Temperature thresholds
-  float minTempC = 10.0f;             // Minimum comfortable temperature
-  float maxTempC = 28.0f;             // Maximum comfortable temperature
-  float overTempC = 30.0f;            // Emergency over-temperature
-  
-  // Window opening thresholds
-  float openWindowAboveTempC = 25.0f; // Open window if temp above this
-  float closeWindowBelowTempC = 20.0f; // Close window if temp below this
-  
-  // Hysteresis for window control
-  float windowHysteresisC = 2.0f;     // Prevent chattering
+  float minTempC = 10.0f;
+  float maxTempC = 28.0f;
+  float overTempC = 30.0f;
+  float openWindowAboveTempC = 25.0f;
+  float closeWindowBelowTempC = 20.0f;
+  float windowHysteresisC = 2.0f;
 };
 
 // ============================================================================
@@ -58,70 +51,18 @@ struct ClimateData {
   unsigned long lastUpdateMs = 0;
 };
 
-// ============================================================================
-// CLIMATE INSTANCE
-// ============================================================================
-
 extern ClimateData climateData;
 
-// ============================================================================
-// CLIMATE CONTROL FUNCTIONS
-// ============================================================================
-
-/**
- * Initialize climate automation system
- */
 void climate_init();
-
-/**
- * Update climate automation
- * Should be called in main loop
- */
 void climate_update();
-
-/**
- * Set climate mode
- */
 void climate_setMode(ClimateMode mode);
-
-/**
- * Get current climate mode
- */
 ClimateMode climate_getMode();
-
-/**
- * Manual door open command
- */
 void climate_doorOpen();
-
-/**
- * Manual door close command
- */
 void climate_doorClose();
-
-/**
- * Manual window open command
- */
 void climate_windowOpen();
-
-/**
- * Manual window close command
- */
 void climate_windowClose();
-
-/**
- * Get climate configuration
- */
 ClimateConfig* climate_getConfig();
-
-/**
- * Get climate data
- */
 ClimateData* climate_getData();
-
-/**
- * Get mode name
- */
 const char* climate_getModeName(ClimateMode mode);
 
 #endif // CLIMATE_H
