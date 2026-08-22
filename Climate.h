@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include "Globals.h"
-#include "Motor.h"
 #include "Heater.h"
 #include "Light.h"
 

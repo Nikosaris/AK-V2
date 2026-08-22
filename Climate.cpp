@@ -1,6 +1,8 @@
 #include "Climate.h"
 #include "Sensors.h"
 #include "RTC.h"
+#include "Door.h"
+#include "Window.h"
 
 // ============================================================================
 // CLIMATE DATA
@@ -8,10 +10,6 @@
 
 ClimateData climateData;
 static ClimateConfig climateConfig;
-
-// External motor instances (from Motor.cpp)
-extern Motor doorMotor;
-extern Motor windowMotor;
 
 // ============================================================================
 // INITIALIZATION
@@ -45,22 +43,22 @@ void climate_init() {
 // ============================================================================
 
 void climate_doorOpen() {
-  motor_setCommand(&doorMotor, MotorCommand::OPEN);
+  door_open();
   climateData.doorOpen = true;
 }
 
 void climate_doorClose() {
-  motor_setCommand(&doorMotor, MotorCommand::CLOSE);
+  door_close();
   climateData.doorOpen = false;
 }
 
 void climate_windowOpen() {
-  motor_setCommand(&windowMotor, MotorCommand::OPEN);
+  window_open();
   climateData.windowOpen = true;
 }
 
 void climate_windowClose() {
-  motor_setCommand(&windowMotor, MotorCommand::CLOSE);
+  window_close();
   climateData.windowOpen = false;
 }
 
@@ -96,16 +94,11 @@ void climate_update() {
 
   // Handle different climate modes
   switch (climateConfig.mode) {
-    // ========================================================================
     case ClimateMode::MANUAL: {
-      // Manual mode - no automatic control
-      // User commands via climate_doorOpen(), climate_doorClose(), etc.
       break;
     }
 
-    // ========================================================================
     case ClimateMode::SCHEDULE: {
-      // Scheduled mode - open/close at fixed times
       bool shouldBeOpen = isDay;
 
       if (shouldBeOpen && !climateData.doorOpen) {
@@ -114,7 +107,6 @@ void climate_update() {
         climate_doorClose();
       }
 
-      // Window control based on temperature
       if (climateData.currentTempC > climateConfig.openWindowAboveTempC) {
         windowShouldBeOpen = true;
       } else if (climateData.currentTempC < climateConfig.closeWindowBelowTempC) {
@@ -130,12 +122,7 @@ void climate_update() {
       break;
     }
 
-    // ========================================================================
     case ClimateMode::SMART: {
-      // Smart mode - temperature and weather aware
-      // Combines scheduled and temperature-based control
-
-      // Door control: open during day, close at night
       bool shouldBeOpen = isDay && climateData.currentTempC < climateConfig.overTempC;
 
       if (shouldBeOpen && !climateData.doorOpen) {
@@ -144,7 +131,6 @@ void climate_update() {
         climate_doorClose();
       }
 
-      // Window control with hysteresis
       if (climateData.currentTempC > climateConfig.openWindowAboveTempC) {
         windowShouldBeOpen = true;
       } else if (climateData.currentTempC < (climateConfig.closeWindowBelowTempC - climateConfig.windowHysteresisC)) {
